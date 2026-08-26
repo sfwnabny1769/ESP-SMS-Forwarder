@@ -173,7 +173,7 @@ void GSMManager::update() {
             // 2. Konfigurasi SMS Mode & Storage SIM Card
             sendCommand("AT+CMGF=1", 1000);                    // SMS Text Mode
             sendCommand("AT+CPMS=\"SM\",\"SM\",\"SM\"", 1000); // Set SMS storage ke memori Kartu SIM (SM)
-            sendCommand("AT+CNMI=2,2,0,0,0", 1000);            // Notifikasi SMS masuk langsung
+            sendCommand("AT+CNMI=2,1,0,0,0", 1000);            // Notifikasi index SMS masuk (+CMTI: "SM",x)
 
             Serial.println("[GSM Boot] Konfigurasi SMS Text Mode & Penyimpanan Memori SIM (SM) Selesai.");
             Serial.println("[GSM Boot] Memulai pemantauan registrasi jaringan dan sinyal seluler...\n");
@@ -289,13 +289,21 @@ void GSMManager::update() {
             Serial.printf("[GSM Registrasi Event] %s\n", line.c_str());
             _lastRegistrationCheck = 0; // Trigger immediate evaluation
         }
-        // 5. Detect SMS notification: +CMTI: "SM",3
+        // 5. Detect SMS notification index: +CMTI: "SM",3
         else if (line.indexOf("+CMTI:") != -1) {
             int commaIdx = line.indexOf(",", line.indexOf("+CMTI:"));
             if (commaIdx != -1) {
                 int smsIndex = line.substring(commaIdx + 1).toInt();
                 Serial.printf("\n[GSM Notifikasi] SMS Masuk Baru Terdeteksi pada Memori SIM Index #%d!\n", smsIndex);
                 _pendingSMSIndexes.push(smsIndex);
+            }
+        }
+        // 6. Detect Direct SMS Stream: +CMT: "+62812...",,"26/08/26,21:40:00+28"
+        else if (line.indexOf("+CMT:") != -1) {
+            Serial.println("\n[GSM Notifikasi] Direct SMS (+CMT) Terdeteksi dari Serial!");
+            SMSMessage msg = parseCMTResponse(line);
+            if (msg.phone.length() > 0 && msg.message.length() > 0) {
+                _smsQueue.push(msg);
             }
         }
     }
@@ -383,6 +391,61 @@ SMSMessage GSMManager::parseCMGRResponse(int index, String raw) {
         body.trim();
         sms.message = body;
     }
+
+    return sms;
+}
+
+SMSMessage GSMManager::parseCMTResponse(String headerLine) {
+    SMSMessage sms;
+    sms.index = -1; // Direct incoming SMS stream
+    sms.phone = "";
+    sms.message = "";
+    sms.datetime = "";
+
+    // Header example: +CMT: "+62812345678",,"26/08/26,21:40:00+28"
+    int q1 = headerLine.indexOf("\"");
+    int q2 = headerLine.indexOf("\"", q1 + 1);
+    if (q1 != -1 && q2 != -1) {
+        sms.phone = headerLine.substring(q1 + 1, q2);
+        sms.phone.trim();
+    }
+
+    int q3 = headerLine.indexOf("\"", q2 + 1);
+    int q4 = headerLine.indexOf("\"", q3 + 1);
+    int q5 = headerLine.indexOf("\"", q4 + 1);
+    int q6 = headerLine.indexOf("\"", q5 + 1);
+
+    String rawTime = "";
+    if (q5 != -1 && q6 != -1) {
+        rawTime = headerLine.substring(q5 + 1, q6);
+    } else if (q3 != -1 && q4 != -1) {
+        rawTime = headerLine.substring(q3 + 1, q4);
+    }
+
+    if (rawTime.length() >= 17) {
+        String year = "20" + rawTime.substring(0, 2);
+        String month = rawTime.substring(3, 5);
+        String day = rawTime.substring(6, 8);
+        String time = rawTime.substring(9, 17);
+        sms.datetime = year + "-" + month + "-" + day + " " + time;
+    }
+
+    // Read next line for message body
+    unsigned long startWait = millis();
+    while (!_serial->available() && (millis() - startWait < 1500)) {
+        delay(10);
+    }
+
+    if (_serial->available()) {
+        String body = _serial->readStringUntil('\n');
+        body.trim();
+        sms.message = body;
+    }
+
+    Serial.println("\n[GSM Direct SMS Diterima]");
+    Serial.printf("  Pengirim: %s\n", sms.phone.c_str());
+    Serial.printf("  Waktu   : %s\n", sms.datetime.c_str());
+    Serial.printf("  Pesan   : %s\n\n", sms.message.c_str());
 
     return sms;
 }
@@ -599,4 +662,3 @@ String GSMManager::executeCustomAT(String command, uint32_t timeout) {
     command.trim();
     return sendCommand(command, timeout);
 }
-

@@ -49,7 +49,7 @@ private:
 
     // Parsing helpers
     SMSMessage parseCMGRResponse(int index, String rawResponse);
-    void parseCMGLResponse(String rawResponse);
+    SMSMessage parseCMTResponse(String headerLine);
 
 public:
     GSMManager();
@@ -80,4 +80,3 @@ public:
 };
 
 #endif // GSM_MANAGER_H
-

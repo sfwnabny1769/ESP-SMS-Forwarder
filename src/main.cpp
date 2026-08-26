@@ -102,8 +102,12 @@ void loop() {
         Serial.printf("\n[Forwarder] Meneruskan SMS dari %s ke Laravel API...\n", sms.phone.c_str());
 
         if (wifi.isConnected() && api.sendSMS(sms)) {
-            gsm.deleteSMS(sms.index);
-            Serial.printf("[Forwarder] SMS #%d berhasil disimpan ke Web dan dihapus dari SIM.\n", sms.index);
+            if (sms.index > 0) {
+                gsm.deleteSMS(sms.index);
+                Serial.printf("[Forwarder] SMS #%d berhasil disimpan ke Web dan dihapus dari SIM.\n", sms.index);
+            } else {
+                Serial.println("[Forwarder] SMS streaming berhasil disimpan ke Web.");
+            }
         } else {
             Serial.println("[Forwarder Warning] API error atau WiFi terputus. SMS tetap disimpan di SIM untuk dicoba ulang.");
         }

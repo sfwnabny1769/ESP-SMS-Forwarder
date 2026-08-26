@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\DB;
 
 class SmsService
 {
+    //nganuin telegramservoce biar masuk sini
+    public function __construct(
+        protected TelegramService $TelegramService
+        ){
+    }
     /**
      * Store incoming SMS forwarded by ESP32 gateway.
      */
@@ -19,14 +24,23 @@ class SmsService
             ? Carbon::parse($data['received_at'])
             : now();
 
-        return Sms::create([
+// simpan ke database
+
+        $sms = Sms::create([
             'device_id' => $device->id,
             'phone' => $data['phone'],
             'message' => $data['message'],
             'received_at' => $receivedAt,
             'processed' => $data['processed'] ?? false,
         ]);
+
+        // kirim ke telegram
+        $this->TelegramService->sendSmsNotification($sms);
+
+        return $sms;
     }
+
+
 
     /**
      * Get paginated SMS logs with search & device filtering.
