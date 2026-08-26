@@ -25,4 +25,3 @@ Route::get('devices/{device}/command-status', [DeviceController::class, 'getComm
 Route::resource('sms', SmsController::class)->only(['index', 'show', 'destroy']);
 Route::post('sms/sync-sim', [SmsController::class, 'syncFromSim'])->name('sms.sync-sim');
 Route::patch('sms/{sm}/toggle-processed', [SmsController::class, 'toggleProcessed'])->name('sms.toggle-processed');
-

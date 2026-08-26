@@ -106,4 +106,3 @@ class DeviceApiTest extends TestCase
         ]);
     }
 }
-
