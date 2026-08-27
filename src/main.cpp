@@ -3,7 +3,8 @@
 #include "WifiManagerCustom.h"                                                                                                      
 #include "GSMManager.h"                                                                                                             
 #include "ApiClient.h"                                                                                                              
-#include "TelegramClient.h"                                                                                                         
+#include "TelegramClient.h"
+#include <vector>                                                                                                         
                                                                                                                                     
 // ============================================================================                                                     
 // Global Instances untuk Tri-Mode Gateway                                                                                          
@@ -13,7 +14,20 @@ GSMManager        gsm;       // [Hardware] SIM800L Engine & AT State Machine
 ApiClient         api;       // [Mode 3] Laravel REST API Client                                                                    
 TelegramClient    telegram;  // [Mode 1] Direct-to-Telegram HTTPS Client                                                            
                                                                                                                                     
+
+// Struktur data untuk melacak jumlah percobaan retry                                                                               
+struct QueuedSMS {                                                                                                                  
+    SMSMessage sms;                                                                                                                 
+    int retryCount;                                                                                                                 
+}; 
+
+// Antrean penampung SMS yang gagal terkirim (Offline Retry Queue)                                                                  
+std::vector<QueuedSMS> failedQueue;                                                                                                
+                                                                                                                                    
 unsigned long lastHeartbeatTime = 0;                                                                                                
+unsigned long lastRetryAttempt = 0;                                                                                                 
+const unsigned long RETRY_INTERVAL = 15000; // Coba kirim ulang setiap 15 detik                                                     
+const int MAX_RETRY_LIMIT = 5;              // Maksimal 5x percobaan sebelum ditandai gagal permanen                                                                                                
                                                                                                                                     
 void setup() {                                                                                                                      
     Serial.begin(115200);                                                                                                           
@@ -106,30 +120,80 @@ void loop() {
         bool tgSuccess = false;                                                                                                     
         bool apiSuccess = false;                                                                                                    
                                                                                                                                     
-        // 🟢 Langkah A [MODE 1]: Selalu utamakan kirim langsung ke Telegram (24/7 Standalone)                                      
+        // [MODE 1]: Selalu utamakan kirim langsung ke Telegram (24/7 Standalone)                                      
         if (telegram.isConfigured() && wifi.isConnected()) {                                                                        
             Serial.println("[Forwarder] [Mode 1] Mengirim langsung ke Telegram Cloud API...");                                      
             tgSuccess = telegram.sendSMS(sms);                                                                                      
-        } else if (!telegram.isConfigured()) {                                                                                      
-            Serial.println("[Forwarder] [Mode 1] Lewat: Telegram Bot Token / Chat ID belum diset.");                                
-        }                                                                                                                           
+        }                                                                                                                          
                                                                                                                                     
-        // 🔵 Langkah B [MODE 3]: Kirim ke Backend Laravel jika sinkronisasi aktif                                                  
+        // [MODE 3]: Kirim ke Backend Laravel jika sinkronisasi aktif                                                  
         if (wifi.isServerSyncEnabled() && wifi.getApiUrl().length() > 0 && wifi.isConnected()) {                                    
             Serial.println("[Forwarder] [Mode 3] Meneruskan ke Laravel REST API...");                                               
             apiSuccess = api.sendSMS(sms);                                                                                          
         }                                                                                                                           
                                                                                                                                     
-        // 🗑️ Langkah C: Hapus SMS dari memori SIM card jika sudah terkirim atau ditangani                                          
-        if (tgSuccess || apiSuccess || !wifi.isConnected()) {                                                                       
+        // 🗑️ Langkah C: Hapus SMS dari memori SIM card jika sudah terkirim atau ditangani dan retry queue                                          
+        if (tgSuccess) {                                                                                                            
+            // Berhasil terkirim ke Telegram -> Aman untuk dihapus dari kartu SIM                                                   
             if (sms.index > 0) {                                                                                                    
                 gsm.deleteSMS(sms.index);                                                                                           
-                Serial.printf("[Forwarder] SMS #%d berhasil diproses dan dibersihkan dari kartu SIM.\n", sms.index);                
+                Serial.printf("[Forwarder] SMS #%d berhasil dikirim & dihapus dari kartu SIM.\n", sms.index);                       
             }                                                                                                                       
         } else {                                                                                                                    
-            Serial.println("[Forwarder Warning] Pengiriman gagal. SMS tetap disimpan di SIM untuk dicoba ulang.");                  
+            // Gagal kirim (WiFi mati / error) -> Masukkan ke antrean retry & jangan hapus dari SIM!                                
+            Serial.println("[Forwarder Warning] Gagal kirim ke Telegram. Menyimpan SMS ke Antrean Retry...");                       
+            failedQueue.push_back({sms, 0}); // Mulai dengan retryCount = 0                                                                                              
+        } 
+    }
+        
+    // 4. [RETRY WORKER] Memproses Antrean SMS yang Tertunda Saat WiFi Kembali Online
+    if (wifi.isConnected() && (currentMillis - lastRetryAttempt >= RETRY_INTERVAL)) {                                               
+        lastRetryAttempt = currentMillis;                                                                                           
+                                                                                                                                    
+        // A. Coba kirim ulang SMS yang ada di antrean memori                                                                       
+        if (!failedQueue.empty()) {                                                                                                 
+            Serial.printf("\n[Retry Worker] Memproses %d pesan dalam antrean retry...\n", failedQueue.size());                      
+                                                                                                                                    
+            for (auto it = failedQueue.begin(); it != failedQueue.end(); ) {                                                        
+                if (telegram.sendSMS(it->sms)) {                                                                                        
+                    Serial.printf("[Retry Worker] SMS dari %s BERHASIL dikirim ulang!\n", it->sms.phone.c_str());                       
+                                                                                                                                    
+                    // Hapus dari SIM card jika index valid                                                                         
+                    if (it->sms.index > 0) {                                                                                            
+                        gsm.deleteSMS(it->sms.index);                                                                                   
+                    }                                                                                                               
+                                                                                                                                    
+                    // Hapus dari antrean memori                                                                                    
+                    it = failedQueue.erase(it);                                                                                     
+                } else {                                                                                                            
+                it->retryCount++;                                                                                               
+                    Serial.printf("[Retry Worker] Percobaan #%d gagal untuk SMS dari %s.\n", it->retryCount, it->sms.phone.c_str());
+                                                                                                                                    
+                    if (it->retryCount >= MAX_RETRY_LIMIT) {                                                                        
+                        Serial.printf("[Retry Worker] ❌ Pesan dari %s mencapai batas maksimal retry (%d). Ditandai GAGAL PERMANEN.\n",                                                                                                                                  
+                                        it->sms.phone.c_str(), MAX_RETRY_LIMIT);                                                      
+                                                                                                                                    
+                        // Bersihkan dari kartu SIM agar memori tidak penuh                                                         
+                        if (it->sms.index > 0) {                                                                                    
+                            gsm.deleteSMS(it->sms.index);                                                                           
+                        }                                                                                                           
+                        it = failedQueue.erase(it); // Hapus dari antrean                                                           
+                    } else {                                                                                                        
+                        ++it; // Lanjut ke pesan berikutnya                                                                         
+                    }                                                                                                                            
+                }                                                                                                                   
+            }                                                                                                                       
         }                                                                                                                           
-    }                                                                                                                               
+                                                                                                                                    
+        // B. Periksa apakah ada SMS yang tersangkut di memori kartu SIM                                                            
+        // (misal masuk saat ESP32 mati/reboot)                                                                                     
+        if (failedQueue.empty()) {                                                                                                  
+            int pulledCount = gsm.syncStoredSMS(false); // Baca tanpa hapus langsung                                                
+            if (pulledCount > 0) {                                                                                                  
+                Serial.printf("[Auto-Sweep] Ditemukan %d pesan tersimpan di SIM card. Memproses...\n", pulledCount);                
+            }                                                                                                                       
+        }                                                                                                                           
+    }                                                                                                                                                                                                                                                                         
                                                                                                                                     
     delay(10); // Yield ke FreeRTOS background tasks                                                                                
 }    
