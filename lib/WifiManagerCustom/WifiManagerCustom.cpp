@@ -122,7 +122,7 @@ void WifiManagerCustom::update() {
     if (_inPortalMode) {
         _dnsServer.processNextRequest();
         _server.handleClient();
-        return;
+        //return; (Jangan gunakan return; agar loop() di main.cpp tetap bisa lanjut memproses GSM) 
     }
 
     // 2. Deteksi tombol BOOT (Setup Trigger) ditekan selama 3 detik
@@ -187,11 +187,7 @@ void WifiManagerCustom::startConfigPortal(bool autoTriggered) {
     setupWebRoutes(networkCount);
     _server.begin();
 
-    while (_inPortalMode) {
-        _dnsServer.processNextRequest();
-        _server.handleClient();
-        delay(10);
-    }
+    Serial.println("[Portal] Web Server & DNS berhasil dijalankan (Non-blocking)."); 
 }
 
 void WifiManagerCustom::setupWebRoutes(int networkCount) {
