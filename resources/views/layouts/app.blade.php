@@ -193,12 +193,33 @@
                 <h5 class="m-0 fw-bold">@yield('page-title', 'Overview')</h5>
             </div>
             <div class="d-flex align-items-center gap-3">
-                <span class="badge bg-light text-dark border p-2">
+                <span class="badge bg-light text-dark border p-2 d-none d-md-inline-block">
                     <i class="bi bi-clock me-1 text-primary"></i> {{ now()->format('d M Y H:i') }}
                 </span>
-                <span class="badge bg-success-subtle text-success border border-success-subtle p-2">
-                    <i class="bi bi-check-circle-fill me-1"></i> Laravel 12 Server
-                </span>
+
+                <!-- User Dropdown & Logout -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-light dropdown-toggle d-flex align-items-center gap-2 border text-dark py-1 px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; font-size: 0.85rem;">
+                            {{ strtoupper(substr(Auth::user()->name ?? 'A', 0, 1)) }}
+                        </div>
+                        <span class="fw-medium small d-none d-sm-inline">{{ Auth::user()->name ?? 'Administrator' }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2" style="min-width: 200px;">
+                        <li class="px-3 py-2 border-bottom">
+                            <div class="fw-bold small text-dark">{{ Auth::user()->name ?? 'Admin' }}</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">{{ Auth::user()->email ?? '' }}</div>
+                        </li>
+                        <li>
+                            <form action="{{ route('logout') }}" method="POST" class="m-0">
+                                @csrf
+                                <button type="submit" class="dropdown-item text-danger py-2 d-flex align-items-center gap-2">
+                                    <i class="bi bi-box-arrow-right"></i> Keluar (Logout)
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </nav>
 
