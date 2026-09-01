@@ -4,25 +4,49 @@
 // ============================================================================
 // WiFi Configuration
 // ============================================================================
-#define WIFI_SSID         "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD     "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID             "YOUR_WIFI_SSID"
+#define WIFI_PASSWORD         "YOUR_WIFI_PASSWORD"
 
 // ============================================================================
 // Backend Laravel API Configuration
 // ============================================================================
-#define API_URL           "http://192.168.1.100:8000"
-#define DEVICE_TOKEN      "ESP32_DEFAULT_SECRET_TOKEN_12345"
+#define API_URL               "http://192.168.1.100:8000"
+#define DEVICE_TOKEN          "ESP32_DEFAULT_SECRET_TOKEN_12345"
+#define DEFAULT_SERVER_SYNC_ENABLED true
+
+// ============================================================================
+// Telegram Bot Configuration (Mode 1 Standalone)
+// ============================================================================
+#define DEFAULT_TELEGRAM_BOT_TOKEN  ""
+#define DEFAULT_TELEGRAM_CHAT_ID    ""
+
+// ============================================================================
+// Hardware Setup / Trigger Pin (Tombol BOOT ESP32-S3 default GPIO 0)
+// ============================================================================
+#define SETUP_TRIGGER_PIN     0
 
 // ============================================================================
 // SIM800L Hardware Pin & Serial Configuration (ESP32-S3 default)
 // ============================================================================
-#define SIM800_RX         16  // ESP32 RX2 connected to SIM800L TX
-#define SIM800_TX         17  // ESP32 TX2 connected to SIM800L RX
-#define SIM800_BAUD       9600
+#define SIM800_RX             16  // ESP32 RX2 connected to SIM800L TX
+#define SIM800_TX             17  // ESP32 TX2 connected to SIM800L RX
+#define SIM800_BAUD           9600
+
+// ============================================================================
+// OLED Display Configuration (SSD1306 0.96" I2C 128x64)
+// ============================================================================
+#define OLED_SDA              8
+#define OLED_SCL              9
+#define OLED_RESET            -1
+#define SCREEN_WIDTH          128
+#define SCREEN_HEIGHT         64
+#define OLED_I2C_ADDRESS      0x3C
+#define OLED_TIMEOUT          15000
 
 // ============================================================================
 // Timing Constants (in milliseconds)
 // ============================================================================
-#define HEARTBEAT_INTERVAL 10000 // Send heartbeat every 10 seconds for fast remote AT execution
+#define HEARTBEAT_INTERVAL    10000 // Send heartbeat every 10 seconds for fast remote AT execution
+#define WIFI_CONNECT_TIMEOUT  15000
 
 #endif // CONFIG_H

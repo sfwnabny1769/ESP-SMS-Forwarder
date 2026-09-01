@@ -23,6 +23,9 @@ private:
     unsigned long _buttonPressStart;
     bool          _inPortalMode;
 
+    String _portalSSID;
+    String _portalPassword;
+
     WebServer   _server;
     DNSServer   _dnsServer;
     Preferences _prefs;
@@ -31,7 +34,8 @@ private:
 
     void loadFromPreferences();
     void saveToPreferences(String ssid, String pass, String tgToken, String tgChat, String apiUrl, String token, bool syncServer);
-    void setupWebRoutes(int networkCount);
+    void setupWebRoutes();
+    void handlePortalRoot();
     String generatePortalHtml(int networkCount);
     String generateSuccessHtml(String message, bool restart);
     bool isIp(String str);
@@ -43,22 +47,27 @@ public:
     void begin();
     void update();
     void startConfigPortal(bool autoTriggered = false);
+    void stopConfigPortal();
     void resetConfig();
 
     bool isConnected();
     bool isPortalRunning() const { return _inPortalMode; }
 
-    // Getters untuk Mode 1, Mode 2, dan Mode 3                                                                                     
-    String getSSID() const { return _ssid; }                                                                                        
-    String getTelegramToken() const { return _telegramBotToken; }                                                                   
-    String getTelegramChatId() const { return _telegramChatId; }                                                                    
-    String getApiUrl() const { return _apiUrl; }                                                                                    
-    String getDeviceToken() const { return _deviceToken; }                                                                          
-    bool isServerSyncEnabled() const { return _serverSyncEnabled; }                                                                 
-                                                                                                                                    
-    String getIP() const { return WiFi.localIP().toString(); }                                                                      
-    String getAPIP() const { return WiFi.softAPIP().toString(); }                                                                   
-    String getMacAddress() const { return WiFi.macAddress(); }  
+    // Getters untuk Mode 1, Mode 2, dan Mode 3
+    String getSSID() const { return _ssid; }
+    String getTelegramToken() const { return _telegramBotToken; }
+    String getTelegramChatId() const { return _telegramChatId; }
+    String getApiUrl() const { return _apiUrl; }
+    String getDeviceToken() const { return _deviceToken; }
+    bool isServerSyncEnabled() const { return _serverSyncEnabled; }
+
+    // Getters untuk Mode Portal
+    String getPortalSSID() const { return _portalSSID; }
+    String getPortalPassword() const { return _portalPassword; }
+
+    String getIP() const { return WiFi.localIP().toString(); }
+    String getAPIP() const { return WiFi.softAPIP().toString(); }
+    String getMacAddress() const { return WiFi.macAddress(); }
 };
 
 #endif // WIFI_MANAGER_CUSTOM_H

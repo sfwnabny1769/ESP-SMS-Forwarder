@@ -70,6 +70,7 @@ public:
     String getRegistrationStatus();
     int getRegistrationCode();
     bool isNetworkRegistered();
+    float getBatteryVoltage();
     void logStatusSummary();
 
     // Pull / Sync SMS stored on SIM card memory
