@@ -164,9 +164,7 @@ void DisplayManager::showBootSplash() {
 }
 
 void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, String regStatus, int smsCount, bool telegramConfigured, bool serverSyncEnabled, float voltage, bool isSystemOk) {
-    if (!_isAvailable) return;
-
-    wakeUp();
+    if (!_isAvailable || !_isDisplayOn) return;
 
     _display.clearDisplay();
 

@@ -115,6 +115,7 @@ void loop() {
                 // Jika ditekan singkat (antara 50ms hingga 2500ms), bangunkan OLED
                 if (pressDuration >= 50 && pressDuration < 2500) {
                     Serial.println("[Button] Klik tombol BOOT terdeteksi: Menampilkan Status di Layar OLED.");
+                    display.wakeUp();
                     display.showStatus(
                         wifi.isConnected(),
                         wifi.isConnected() ? wifi.getIP() : "No WiFi",
