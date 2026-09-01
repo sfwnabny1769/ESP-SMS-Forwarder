@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Device;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -10,18 +11,11 @@ class DeviceApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_can_fetch_device_list(): void
+    public function test_public_device_list_endpoint_is_disabled_for_security(): void
     {
-        Device::factory()->count(3)->create();
-
         $response = $this->getJson('/api/device');
 
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'data' => [
-                    '*' => ['id', 'name', 'token', 'status', 'is_online', 'signal', 'operator', 'last_seen']
-                ]
-            ]);
+        $response->assertStatus(404);
     }
 
     public function test_heartbeat_requires_valid_token(): void
@@ -75,9 +69,10 @@ class DeviceApiTest extends TestCase
 
     public function test_can_queue_sync_sim_sms_command_for_device(): void
     {
+        $user = User::factory()->create();
         $device = Device::factory()->create();
 
-        $response = $this->postJson("/devices/{$device->id}/sync-sms");
+        $response = $this->actingAs($user)->postJson("/devices/{$device->id}/sync-sms");
 
         $response->assertStatus(200)
             ->assertJson([
@@ -93,9 +88,10 @@ class DeviceApiTest extends TestCase
 
     public function test_can_queue_sync_sim_sms_from_sms_page(): void
     {
+        $user = User::factory()->create();
         $device = Device::factory()->create();
 
-        $response = $this->post('/sms/sync-sim', [
+        $response = $this->actingAs($user)->post('/sms/sync-sim', [
             'device_id' => $device->id,
         ]);
 

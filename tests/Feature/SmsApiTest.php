@@ -11,19 +11,11 @@ class SmsApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_can_fetch_sms_list(): void
+    public function test_public_sms_list_endpoint_is_disabled_for_security(): void
     {
-        $device = Device::factory()->create();
-        Sms::factory()->count(5)->create(['device_id' => $device->id]);
-
         $response = $this->getJson('/api/sms');
 
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'data' => [
-                    '*' => ['id', 'device_id', 'phone', 'message', 'received_at', 'processed']
-                ]
-            ]);
+        $response->assertStatus(405);
     }
 
     public function test_can_store_incoming_sms_with_valid_token(): void

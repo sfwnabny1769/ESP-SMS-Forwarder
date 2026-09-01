@@ -1,47 +1,57 @@
 # SMS Gateway Backend (ESP32 + SIM800L) - Laravel 12
 
-Sistem Backend SMS Gateway berbasis **Laravel 12 (PHP 8.3)** & **Bootstrap 5** yang dirancang untuk menerima, menyimpan, dan mengelola SMS dari modul **ESP32 + SIM800L** melalui REST API yang aman dan terstruktur.
+Sistem Backend SMS Gateway berbasis **Laravel 12 (PHP 8.3)** & **Bootstrap 5** yang dirancang untuk menerima, menyimpan, dan mengelola SMS dari modul **ESP32-S3 + SIM800L** melalui REST API yang aman dan terstruktur serta dilengkapi **Admin Dashboard Terproteksi**.
 
 ---
 
 ## 📌 Fitur Utama
 
-1. **Device Authentication**: Keamanan API berbasis **Device Token** (HTTP Header `X-Device-Token` / Bearer / JSON Body).
-2. **REST API Gateway**: Endpoint standar untuk Heartbeat status perangkat (`POST /api/device/heartbeat`), Respon AT Command (`POST /api/device/command-response`), dan Pengiriman SMS Masuk (`POST /api/sms`).
-3. **Clean Service Architecture**: Pemisahan logika bisnis dari Controller menggunakan **Service Layer** (`DeviceService`, `SmsService`).
-4. **Form Request Validation**: Validasi request ketat untuk API & Web.
-5. **Pemantauan Status SIM Card & Jaringan Realtime**:
-   - Status Kartu SIM: `READY` (Terpasang & Siap) / `UNKNOWN` / `SIM PIN`
-   - Registrasi Sinyal Jaringan Seluler (`AT+CREG?`): Deteksi otomatis saat terhubung ke provider `+CREG: 0,1` (Registered Home) / `+CREG: 0,5` (Registered Roaming) / `+CREG: 0,2` (Searching)
-   - Kuat Sinyal SIM800L (CSQ 0-31, estimasi dBm & Kualitas Sinyal: Sangat Baik / Baik / Cukup / Lemah)
-   - Operator Seluler (AT+COPS?)
-   - Last Seen Activity Tracker
-6. **Penarikan Pesan dari Memori SIM (SIM Storage Pull / Sync)**:
-   - Tombol **"Tarik Pesan dari SIM"** pada Web Dashboard & Device Console
-   - Fitur otomatis penarikan seluruh SMS tersimpan di memori SIM (`AT+CMGL="ALL"`) saat modul pertama kali terhubung ke jaringan (`+CREG: 0,1`) maupun melalui trigger jarak jauh dari Web
-7. **Interactive GSM Live Console & AT Terminal**:
-   - Eksekusi AT Command secara remote dari Web ke ESP32 + SIM800L
-   - Preset AT Command instan: `SYNC_SIM_SMS`, `AT+CMGL="ALL"`, `AT+CPMS?`, `AT+CREG?`, `AT+CSQ`, `AT+CPIN?`, `AT+COPS?`, `AT+CBC`
-8. **Manajemen Data SMS**: Table SMS dengan fitur pencarian live, filter per device, filter status diproses, dan pagination Bootstrap 5.
-9. **CRUD Devices**: Manajemen perangkat ESP32, penambahan device, update status, hapus, dan tombol **Regenerate Token**.
+1. **Keamanan Admin Dashboard (Session Auth & Hardened)**:
+   - Autentikasi Admin berbasis sesi dengan proteksi **Anti Brute-Force Rate Limiting** (maksimal 5 percobaan gagal per menit).
+   - Proteksi **Anti Session-Fixation** (`session()->regenerate()`) dan token **CSRF** pada seluruh form & aksi logout.
+   - Hak akses eksklusif untuk admin terdaftar (seeder awal).
+2. **Device Authentication (IoT REST API)**:
+   - Keamanan API modul ESP32 berbasis **Device Token** unik (HTTP Header `X-Device-Token` / Bearer / JSON Body).
+   - Middleware `EnsureValidDeviceToken` yang memvalidasi setiap request IoT.
+3. **REST API Gateway (IoT Endpoints)**:
+   - Heartbeat status perangkat (`POST /api/device/heartbeat`).
+   - Respon eksekusi AT Command (`POST /api/device/command-response`).
+   - Pengiriman & Ingest SMS Masuk (`POST /api/sms`).
+4. **Pemantauan Status SIM Card & Jaringan Realtime**:
+   - Status Kartu SIM: `READY` / `UNKNOWN` / `SIM PIN`.
+   - Registrasi Sinyal Jaringan Seluler (`AT+CREG?`): `+CREG: 0,1` (Registered Home), `+CREG: 0,5` (Registered Roaming), `+CREG: 0,2` (Searching).
+   - Kuat Sinyal SIM800L (CSQ 0-31, estimasi dBm & Kualitas Sinyal: Sangat Baik / Baik / Cukup / Lemah).
+   - Operator Seluler (`AT+COPS?`).
+   - Last Seen Activity Tracker.
+5. **Penarikan Pesan dari Memori SIM (SIM Storage Sync)**:
+   - Tombol **"Tarik Pesan dari SIM"** pada Web Dashboard & Device Console.
+   - Fitur otomatis penarikan seluruh SMS tersimpan di memori SIM (`AT+CMGL="ALL"`) saat modul pertama kali terhubung ke jaringan maupun melalui trigger jarak jauh dari Web.
+6. **Interactive GSM Live Console & AT Terminal**:
+   - Eksekusi AT Command secara remote dari Web ke ESP32 + SIM800L.
+   - Preset AT Command instan: `SYNC_SIM_SMS`, `AT+CMGL="ALL"`, `AT+CPMS?`, `AT+CREG?`, `AT+CSQ`, `AT+CPIN?`, `AT+COPS?`, `AT+CBC`.
+7. **Manajemen Data SMS**:
+   - Tabel SMS dengan pencarian live, filter per device, filter status diproses, dan pagination Bootstrap 5.
+8. **CRUD Devices**:
+   - Manajemen perangkat ESP32, penambahan device, update status, hapus, dan tombol **Regenerate Token**.
 
 ---
 
-## 📂 Folder & Architecture Structure
+## 📂 Struktur Folder Proyek
 
 ```text
 app/
 ├── Http/
 │   ├── Controllers/
 │   │   ├── Api/
-│   │   │   ├── DeviceController.php     # Endpoint GET /api/device, POST /api/device/heartbeat & /api/device/command-response
-│   │   │   └── SmsController.php        # Endpoint GET /api/sms & POST /api/sms
+│   │   │   ├── DeviceController.php     # Endpoint POST /api/device/heartbeat & /api/device/command-response
+│   │   │   └── SmsController.php        # Endpoint POST /api/sms
 │   │   └── Web/
+│   │       ├── AuthController.php       # Controller Login, Logout & Rate Limiting
 │   │       ├── DashboardController.php  # Controller halaman utama Dashboard
 │   │       ├── DeviceController.php     # CRUD Perangkat ESP32, syncSimSms & Live AT Console
 │   │       └── SmsController.php        # List, Detail, Toggle, Delete SMS & syncFromSim
 │   ├── Middleware/
-│   │   └── EnsureValidDeviceToken.php   # Otorisasi token device pada API
+│   │   └── EnsureValidDeviceToken.php   # Otorisasi token device pada API ESP32
 │   ├── Requests/
 │   │   ├── Api/
 │   │   │   ├── DeviceHeartbeatRequest.php
@@ -54,45 +64,52 @@ app/
 │       └── SmsResource.php              # API Transformer untuk SMS
 ├── Models/
 │   ├── Device.php                       # Model Device & Relasi
-│   └── Sms.php                          # Model SMS, Scope Search & Filter
+│   ├── Sms.php                          # Model SMS, Scope Search & Filter
+│   └── User.php                         # Model Admin User
 └── Services/
     ├── DeviceService.php                # Service Logic Device, Heartbeat & AT Queue
     └── SmsService.php                   # Service Logic SMS & Statistics
 
 src/
-└── main.cpp                             # Firmware ESP32-S3: State Machine, SMS Detection, SIM SMS Sync & AT Console
+└── main.cpp                             # Firmware ESP32-S3: Tri-Mode Gateway Orchestrator
 
 lib/
-├── GSMManager/                          # Driver SIM800L: Registrasi Jaringan (+CREG), Status SIM (+CPIN), Sinyal (CSQ), Sync SIM (CMGL)
 ├── ApiClient/                           # HTTP Client ESP32 untuk REST API Laravel
-└── WifiManagerCustom/                   # Pengelola koneksi & auto-reconnect WiFi
-```
-
+├── GSMManager/                          # Driver SIM800L: AT Command State Machine & Parser
+├── TelegramClient/                      # Direct Telegram HTTPS Client (Mode 1 Standalone)
+└── WifiManagerCustom/                   # On-Chip Web Portal (Mode 2) & NVS Storage Manager
 
 database/
-├── factories/
-│   ├── DeviceFactory.php
-│   └── SmsFactory.php
 ├── migrations/
+│   ├── 0001_01_01_000000_create_users_table.php
 │   ├── 2026_08_07_000001_create_devices_table.php
-│   └── 2026_08_07_000002_create_sms_table.php
+│   ├── 2026_08_07_000002_create_sms_table.php
+│   └── 2026_08_07_000003_add_gsm_debug_columns_to_devices_table.php
 └── seeders/
     ├── DatabaseSeeder.php
     ├── DeviceSeeder.php
-    └── SmsSeeder.php
+    ├── SmsSeeder.php
+    └── UserSeeder.php                   # Default Admin Seeder
+
+public/
+├── css/
+│   └── auth.css                         # Dark theme CSS untuk halaman login
+└── js/
 
 resources/views/
+├── auth/
+│   └── login.blade.php                  # Halaman Login Admin
 ├── layouts/
-│   └── app.blade.php                    # Master Layout Bootstrap 5 + Sidebar
+│   └── app.blade.php                    # Master Layout Bootstrap 5, Sidebar & Navbar Profile
 ├── dashboard.blade.php                  # Dashboard Statistik & Chart
 ├── devices/
-│   └── index.blade.php                  # CRUD Devices & Modal Token
+│   └── index.blade.php                  # CRUD Devices, Modal Token & Live AT Console
 └── sms/
     └── index.blade.php                  # Inbox SMS, Search, Filter & Modal Detail
 
 routes/
-├── api.php                              # REST API Routes
-└── web.php                              # Web Dashboard Routes
+├── api.php                              # REST API Routes (Khusus ESP32 dengan token)
+└── web.php                              # Web Dashboard Routes (Terproteksi auth)
 ```
 
 ---
@@ -123,8 +140,6 @@ php artisan key:generate
 
 ### 3. Konfigurasi Database `.env` (MySQL)
 
-Ubah file `.env` sesuai kredensial MySQL Anda:
-
 ```env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -137,9 +152,14 @@ DB_PASSWORD=
 ### 4. Jalankan Migration & Seeder
 
 ```bash
-# Jalankan migration database beserta data seeder awal
+# Jalankan migration database beserta akun admin & device seeder awal
 php artisan migrate:fresh --seed
 ```
+
+> **Kredensial Default Admin:**
+> - **URL:** `http://127.0.0.1:8000/login`
+> - **Email:** `abin.shafwan@gmail.com`
+> - **Password:** `Teti1769`
 
 ### 5. Jalankan Local Server
 
@@ -147,26 +167,30 @@ php artisan migrate:fresh --seed
 php artisan serve
 ```
 
-Buka browser dan akses: `http://127.0.0.1:8000`
+Buka browser dan akses: `http://127.0.0.1:8000` *(akan otomatis diarahkan ke halaman login jika belum terautentikasi)*.
 
 ---
 
-## 🔌 Dokumentasi REST API (ESP32 Gateway)
+## 🔌 Dokumentasi REST API (ESP32 IoT Gateway)
+
+Semua endpoint IoT wajib menyertakan token perangkat pada HTTP Header `X-Device-Token` atau field JSON `token`.
 
 ### 1. Heartbeat Device (`POST /api/device/heartbeat`)
 
-Dikirimkan oleh ESP32 secara berkala (misal setiap 30-60 detik) untuk mengabarkan status sinyal & operator.
+Dikirimkan oleh ESP32 secara berkala (setiap 30-60 detik) untuk mengabarkan status sinyal, operator, dan mengambil antrean AT Command.
 
 - **Headers**:
   - `Content-Type: application/json`
-  - `X-Device-Token: <TOKEN_DEVICE>` *(atau kirim token dalam body JSON)*
+  - `X-Device-Token: <TOKEN_DEVICE>`
 
 - **Request Body**:
 ```json
 {
   "token": "ESP32_DEFAULT_SECRET_TOKEN_12345",
-  "signal": 27,
-  "operator": "TELKOMSEL"
+  "signal": 28,
+  "operator": "TELKOMSEL",
+  "sim_status": "READY",
+  "reg_status": "Registered Home (+CREG: 0,1)"
 }
 ```
 
@@ -178,12 +202,14 @@ Dikirimkan oleh ESP32 secara berkala (misal setiap 30-60 detik) untuk mengabarka
   "data": {
     "id": 1,
     "name": "ESP32-Gateway-Node01",
-    "token": "ESP32_DEFAULT_SECRET_TOKEN_12345",
     "status": "online",
     "is_online": true,
-    "signal": 27,
+    "signal": 28,
     "operator": "TELKOMSEL",
-    "last_seen": "2026-08-07 09:00:00",
+    "sim_status": "READY",
+    "reg_status": "Registered Home (+CREG: 0,1)",
+    "pending_command": null,
+    "last_seen": "2026-09-01 15:00:00",
     "last_seen_human": "1 second ago"
   }
 }
@@ -195,13 +221,17 @@ Dikirimkan oleh ESP32 secara berkala (misal setiap 30-60 detik) untuk mengabarka
 
 Dikirimkan oleh ESP32 saat menerima SMS baru dari modul SIM800L.
 
+- **Headers**:
+  - `Content-Type: application/json`
+  - `X-Device-Token: <TOKEN_DEVICE>`
+
 - **Request Body**:
 ```json
 {
   "token": "ESP32_DEFAULT_SECRET_TOKEN_12345",
-  "phone": "+628123456789",
-  "message": "Pesan SMS uji coba dari SIM800L",
-  "received_at": "2026-08-07 09:15:00"
+  "phone": "+6281234567890",
+  "message": "Kode verifikasi Anda adalah 492019. Jangan beritahukan kepada siapapun.",
+  "received_at": "2026-09-01 15:05:00"
 }
 ```
 
@@ -214,9 +244,9 @@ Dikirimkan oleh ESP32 saat menerima SMS baru dari modul SIM800L.
     "id": 101,
     "device_id": 1,
     "device_name": "ESP32-Gateway-Node01",
-    "phone": "+628123456789",
-    "message": "Pesan SMS uji coba dari SIM800L",
-    "received_at": "2026-08-07 09:15:00",
+    "phone": "+6281234567890",
+    "message": "Kode verifikasi Anda adalah 492019. Jangan beritahukan kepada siapapun.",
+    "received_at": "2026-09-01 15:05:00",
     "processed": false
   }
 }
@@ -224,44 +254,50 @@ Dikirimkan oleh ESP32 saat menerima SMS baru dari modul SIM800L.
 
 ---
 
-### 3. Get All Devices (`GET /api/device`)
+### 3. Send Command Response (`POST /api/device/command-response`)
 
-- **Response (200 OK)**:
+Dikirimkan oleh ESP32 setelah mengeksekusi AT Command yang diminta oleh Web Admin Console.
+
+- **Headers**:
+  - `Content-Type: application/json`
+  - `X-Device-Token: <TOKEN_DEVICE>`
+
+- **Request Body**:
 ```json
 {
-  "data": [
-    {
-      "id": 1,
-      "name": "ESP32-Gateway-Node01",
-      "token": "ESP32_DEFAULT_SECRET_TOKEN_12345",
-      "status": "online",
-      "is_online": true,
-      "signal": 27,
-      "operator": "TELKOMSEL",
-      "last_seen": "2026-08-07 09:15:00"
-    }
-  ]
+  "token": "ESP32_DEFAULT_SECRET_TOKEN_12345",
+  "command": "AT+CSQ",
+  "response": "+CSQ: 28,0\n\nOK"
+}
+```
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Command response updated successfully.",
+  "data": {
+    "id": 1,
+    "name": "ESP32-Gateway-Node01",
+    "pending_command": null,
+    "command_response": "+CSQ: 28,0\n\nOK",
+    "command_updated_at": "2026-09-01 15:06:00"
+  }
 }
 ```
 
 ---
 
-### 4. Get All SMS (`GET /api/sms`)
+## 🧪 Automated Testing
 
-- **Query Parameters**:
-  - `search`: Kata kunci nomor HP / isi pesan / nama device.
-  - `device_id`: Filter ID device.
-  - `processed`: `1` (Sudah diproses) atau `0` (Belum diproses).
-  - `per_page`: Jumlah record (default 15).
-
----
-
-## 🧪 Testing
-
-Jalankan pengujian otomatis PHPUnit:
+Jalankan pengujian otomatis (Unit & Feature Tests):
 
 ```bash
+# Jalankan seluruh test suite
 php artisan test
+
+# Jalankan khusus pengujian keamanan autentikasi
+php artisan test --filter=AuthTest
 ```
 
 ---

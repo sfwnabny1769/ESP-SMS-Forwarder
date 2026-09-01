@@ -1,0 +1,183 @@
+{
+	"info": {
+		"_postman_id": "9fb910d7-50ef-42e5-affa-22779ec92eea",
+		"name": "SMS Gateway & ESP32 Forwarder API",
+		"description": "Postman collection for ESP32-S3 + SIM800L SMS Gateway Backend (Laravel 12). Includes Device Heartbeat, Command Response, and SMS Ingestion endpoints.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Device Gateway",
+			"item": [
+				{
+					"name": "Device Heartbeat (Valid Token)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Device-Token",
+								"value": "{{device_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"{{device_token}}\",\n  \"signal\": 28,\n  \"operator\": \"TELKOMSEL\",\n  \"sim_status\": \"READY\",\n  \"reg_status\": \"Registered Home (+CREG: 0,1)\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/device/heartbeat",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"device",
+								"heartbeat"
+							]
+						}
+					}
+				},
+				{
+					"name": "Device Heartbeat (Invalid Token - 401)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Device-Token",
+								"value": "INVALID_TOKEN_TEST"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"signal\": 20,\n  \"operator\": \"INDOSAT\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/device/heartbeat",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"device",
+								"heartbeat"
+							]
+						}
+					}
+				},
+				{
+					"name": "AT Command Response",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Device-Token",
+								"value": "{{device_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"{{device_token}}\",\n  \"command\": \"AT+CSQ\",\n  \"response\": \"+CSQ: 28,0\\n\\nOK\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/device/command-response",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"device",
+								"command-response"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "SMS Ingestion",
+			"item": [
+				{
+					"name": "Forward Incoming SMS (Valid)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Device-Token",
+								"value": "{{device_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"{{device_token}}\",\n  \"phone\": \"+6281234567890\",\n  \"message\": \"Kode OTP Anda adalah 749201. Jangan berikan kepada siapapun.\",\n  \"received_at\": \"2026-09-01 15:00:00\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/sms",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"sms"
+							]
+						}
+					}
+				},
+				{
+					"name": "Forward Incoming SMS (Invalid Token - 401)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Device-Token",
+								"value": "WRONG_TOKEN"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phone\": \"+6281234567890\",\n  \"message\": \"Pesan uji coba\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/sms",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"sms"
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:8000"
+		},
+		{
+			"key": "device_token",
+			"value": "ESP32_DEFAULT_SECRET_TOKEN_12345"
+		}
+	]
+}
