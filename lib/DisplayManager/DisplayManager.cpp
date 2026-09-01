@@ -187,13 +187,13 @@ void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signal
     drawSignalArea(1, 2, signalCsq, simStatus, regStatus);
 
     _display.setTextSize(1);
-    _display.setCursor(14, 3);
+    _display.setCursor(13, 3);
     if (simStatus != "READY") {
         _display.print("NO-SIM");
     } else if (regStatus.indexOf("Registered") == -1 && signalCsq <= 0) {
         _display.print("SEARCH");
     } else {
-        String shortOp = operatorName.length() > 4 ? operatorName.substring(0, 4) : operatorName;
+        String shortOp = operatorName.length() > 5 ? operatorName.substring(0, 5) : operatorName;
         _display.print(shortOp.length() > 0 ? shortOp : "GSM");
     }
 

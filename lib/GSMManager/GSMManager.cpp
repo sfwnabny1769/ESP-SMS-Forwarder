@@ -631,7 +631,7 @@ String GSMManager::getOperator() {
             op.trim();
 
             // Smart Provider Name Normalizer ke 4-5 huruf
-            if (op.startsWith("TELKOM") || op.indexOf("TSEL") != -1) return "TSEL";
+            if (op.indexOf("T-SEL") != -1 || op.indexOf("TSEL") != -1 || op.startsWith("TELKOM") || op.startsWith("T-")) return "TSEL";
             if (op.startsWith("INDO") || op.indexOf("ISAT") != -1 || op.indexOf("IM3") != -1) return "ISAT";
             if (op.indexOf("XL") != -1 || op.indexOf("AXIS") != -1) return "XL";
             if (op.indexOf("3") != -1 || op.indexOf("TRI") != -1 || op.indexOf("THREE") != -1) return "TRI";
