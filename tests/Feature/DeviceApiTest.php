@@ -11,18 +11,11 @@ class DeviceApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_can_fetch_device_list(): void
+    public function test_public_device_list_endpoint_is_disabled_for_security(): void
     {
-        Device::factory()->count(3)->create();
-
         $response = $this->getJson('/api/device');
 
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'data' => [
-                    '*' => ['id', 'name', 'token', 'status', 'is_online', 'signal', 'operator', 'last_seen']
-                ]
-            ]);
+        $response->assertStatus(404);
     }
 
     public function test_heartbeat_requires_valid_token(): void

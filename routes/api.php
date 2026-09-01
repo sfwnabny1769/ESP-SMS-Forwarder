@@ -11,12 +11,10 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('device')->group(function () {
-    Route::get('/', [DeviceController::class, 'index']);
     Route::post('/heartbeat', [DeviceController::class, 'heartbeat'])->middleware('device.token');
     Route::post('/command-response', [DeviceController::class, 'commandResponse'])->middleware('device.token');
 });
 
 Route::prefix('sms')->group(function () {
-    Route::get('/', [SmsController::class, 'index']);
     Route::post('/', [SmsController::class, 'store'])->middleware('device.token');
 });
