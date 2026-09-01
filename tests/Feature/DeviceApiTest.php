@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Device;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -75,9 +76,10 @@ class DeviceApiTest extends TestCase
 
     public function test_can_queue_sync_sim_sms_command_for_device(): void
     {
+        $user = User::factory()->create();
         $device = Device::factory()->create();
 
-        $response = $this->postJson("/devices/{$device->id}/sync-sms");
+        $response = $this->actingAs($user)->postJson("/devices/{$device->id}/sync-sms");
 
         $response->assertStatus(200)
             ->assertJson([
@@ -93,9 +95,10 @@ class DeviceApiTest extends TestCase
 
     public function test_can_queue_sync_sim_sms_from_sms_page(): void
     {
+        $user = User::factory()->create();
         $device = Device::factory()->create();
 
-        $response = $this->post('/sms/sync-sim', [
+        $response = $this->actingAs($user)->post('/sms/sync-sim', [
             'device_id' => $device->id,
         ]);
 
