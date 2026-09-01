@@ -38,6 +38,7 @@ bool isLaravelConnected = false;
 unsigned long bootButtonPressTime = 0;
 bool bootButtonHandled = false;
 bool portalDisplayShown = false;
+String lastPortalSSID = "";
 
 void setup() {
     Serial.begin(115200);
@@ -93,8 +94,9 @@ void loop() {
 
     // 2. Mode Display Handler (Portal Mode vs Live Status Mode)
     if (wifi.isPortalRunning()) {
-        if (!portalDisplayShown) {
+        if (!portalDisplayShown || lastPortalSSID != wifi.getPortalSSID()) {
             portalDisplayShown = true;
+            lastPortalSSID = wifi.getPortalSSID();
             Serial.printf("[OLED Portal] Menampilkan SSID: %s, PASS: %s, IP: %s\n",
                           wifi.getPortalSSID().c_str(),
                           wifi.getPortalPassword().c_str(),
@@ -102,7 +104,26 @@ void loop() {
             display.showPortalMode(wifi.getPortalSSID(), wifi.getPortalPassword(), wifi.getAPIP());
         }
     } else {
-        portalDisplayShown = false;
+        if (portalDisplayShown) {
+            // Baru saja keluar dari mode portal (Batal / Reconnect): Bangunkan layar dan tampilkan dashboard status!
+            portalDisplayShown = false;
+            lastPortalSSID = "";
+            display.wakeUp();
+            display.showStatus(
+                wifi.isConnected(),
+                wifi.isConnected() ? wifi.getIP() : "No WiFi",
+                gsm.getSignal(),
+                gsm.getOperator(),
+                gsm.getSIMStatus(),
+                gsm.getRegistrationStatus(),
+                totalSmsReceived,
+                telegram.isConfigured(),
+                wifi.isServerSyncEnabled(),
+                isLaravelConnected,
+                gsmVoltage,
+                gsm.getSIMStatus() == "READY"
+            );
+        }
 
         // Deteksi Tombol BOOT (Single Click = Wake Up OLED)
         if (digitalRead(SETUP_TRIGGER_PIN) == LOW) {

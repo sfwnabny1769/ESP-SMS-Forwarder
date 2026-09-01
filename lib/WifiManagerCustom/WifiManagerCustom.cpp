@@ -130,9 +130,19 @@ void WifiManagerCustom::update() {
         if (_buttonPressStart == 0) {
             _buttonPressStart = millis();
         } else if (millis() - _buttonPressStart >= 3000) {
-            Serial.println("\n[WiFi Manager] 🔘 Tombol BOOT ditahan 3 detik! Membuka Portal Konfigurasi...");
             _buttonPressStart = 0;
-            startConfigPortal(false);
+            if (_inPortalMode) {
+                if (_ssid.length() > 0) {
+                    Serial.println("\n[WiFi Manager] 🔘 Tombol BOOT ditahan 3 detik! Membatalkan Setup Portal & Reconnect...");
+                    stopConfigPortal();
+                } else {
+                    Serial.println("\n[WiFi Manager] 🔘 Tombol BOOT ditahan 3 detik! Merefresh Kredensial Portal...");
+                    startConfigPortal(false);
+                }
+            } else {
+                Serial.println("\n[WiFi Manager] 🔘 Tombol BOOT ditahan 3 detik! Membuka Portal Konfigurasi...");
+                startConfigPortal(false);
+            }
             return;
         }
     } else {
@@ -159,12 +169,8 @@ void WifiManagerCustom::startConfigPortal(bool autoTriggered) {
     _inPortalMode = true;
 
     WiFi.disconnect(true);
-    delay(100);
+    delay(50);
     WiFi.mode(WIFI_AP_STA); // Mode AP_STA agar tetap bisa memindai jaringan WiFi sekitar
-
-    Serial.println("[Portal] Memindai jaringan WiFi sekitar...");
-    int networkCount = WiFi.scanNetworks();
-    Serial.printf("[Portal] Ditemukan %d jaringan WiFi.\n", networkCount);
 
     // Generate Random 4-Digit Suffix untuk SSID Sekali Pakai (No-Cache Conflict pada HP)
     uint32_t randSsidSuffix = (esp_random() % 9000) + 1000;
@@ -191,17 +197,38 @@ void WifiManagerCustom::startConfigPortal(bool autoTriggered) {
     Serial.println("=======================================================\n");
 
     _dnsServer.start(53, "*", apIP);
-    setupWebRoutes(networkCount);
+    setupWebRoutes();
     _server.begin();
+
+    // Trigger Non-blocking background scan
+    WiFi.scanNetworks(true);
 
     Serial.println("[Portal] Web Server & DNS berhasil dijalankan (Non-blocking)."); 
 }
 
-void WifiManagerCustom::setupWebRoutes(int networkCount) {
+void WifiManagerCustom::stopConfigPortal() {
+    _inPortalMode = false;
+    _server.stop();
+    _dnsServer.stop();
+    WiFi.softAPdisconnect(true);
+    delay(50);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(_ssid.c_str(), _password.c_str());
+    Serial.println("[Portal] Hotspot AP dinonaktifkan. Menghubungkan kembali ke WiFi: " + _ssid);
+}
+
+void WifiManagerCustom::handlePortalRoot() {
+    int networkCount = WiFi.scanComplete();
+    if (networkCount < 0) {
+        if (networkCount == -2) WiFi.scanNetworks(true);
+        networkCount = 0;
+    }
+    _server.send(200, "text/html", generatePortalHtml(networkCount));
+}
+
+void WifiManagerCustom::setupWebRoutes() {
     // Route Halaman Utama Portal
-    _server.on("/", HTTP_GET, [this, networkCount]() {
-        _server.send(200, "text/html", generatePortalHtml(networkCount));
-    });
+    _server.on("/", HTTP_GET, [this]() { handlePortalRoot(); });
 
     // Handler Simpan Konfigurasi (POST /save)
     _server.on("/save", HTTP_POST, [this]() {
@@ -274,13 +301,13 @@ void WifiManagerCustom::setupWebRoutes(int networkCount) {
     });
 
     // Captive Portal Redirection Routes
-    _server.on("/generate_204", HTTP_GET, [this, networkCount]() { _server.send(200, "text/html", generatePortalHtml(networkCount)); });
-    _server.on("/gen_204", HTTP_GET, [this, networkCount]() { _server.send(200, "text/html", generatePortalHtml(networkCount)); });
-    _server.on("/hotspot-detect.html", HTTP_GET, [this, networkCount]() { _server.send(200, "text/html", generatePortalHtml(networkCount)); });
-    _server.on("/canonical.html", HTTP_GET, [this, networkCount]() { _server.send(200, "text/html", generatePortalHtml(networkCount)); });
+    _server.on("/generate_204", HTTP_GET, [this]() { handlePortalRoot(); });
+    _server.on("/gen_204", HTTP_GET, [this]() { handlePortalRoot(); });
+    _server.on("/hotspot-detect.html", HTTP_GET, [this]() { handlePortalRoot(); });
+    _server.on("/canonical.html", HTTP_GET, [this]() { handlePortalRoot(); });
     _server.on("/ncsi.txt", HTTP_GET, [this]() { _server.send(200, "text/plain", "Microsoft NCSI"); });
-    _server.on("/connecttest.txt", HTTP_GET, [this, networkCount]() { _server.send(200, "text/html", generatePortalHtml(networkCount)); });
-    _server.on("/redirect", HTTP_GET, [this, networkCount]() { _server.send(200, "text/html", generatePortalHtml(networkCount)); });
+    _server.on("/connecttest.txt", HTTP_GET, [this]() { handlePortalRoot(); });
+    _server.on("/redirect", HTTP_GET, [this]() { handlePortalRoot(); });
 
     _server.onNotFound([this]() {
         _server.sendHeader("Location", "http://192.168.4.1/", true);

@@ -34,7 +34,8 @@ private:
 
     void loadFromPreferences();
     void saveToPreferences(String ssid, String pass, String tgToken, String tgChat, String apiUrl, String token, bool syncServer);
-    void setupWebRoutes(int networkCount);
+    void setupWebRoutes();
+    void handlePortalRoot();
     String generatePortalHtml(int networkCount);
     String generateSuccessHtml(String message, bool restart);
     bool isIp(String str);
@@ -46,6 +47,7 @@ public:
     void begin();
     void update();
     void startConfigPortal(bool autoTriggered = false);
+    void stopConfigPortal();
     void resetConfig();
 
     bool isConnected();
