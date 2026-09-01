@@ -166,13 +166,13 @@ void WifiManagerCustom::startConfigPortal(bool autoTriggered) {
     int networkCount = WiFi.scanNetworks();
     Serial.printf("[Portal] Ditemukan %d jaringan WiFi.\n", networkCount);
 
-    String mac = WiFi.macAddress();
-    mac.replace(":", "");
-    _portalSSID = "ESP-SMS-" + mac.substring(mac.length() - 4);
+    // Generate Random 4-Digit Suffix untuk SSID Sekali Pakai (No-Cache Conflict pada HP)
+    uint32_t randSsidSuffix = (esp_random() % 9000) + 1000;
+    _portalSSID = "ESP-SMS-" + String(randSsidSuffix);
 
     // Generate Dynamic 8-Digit Random PIN Password via hardware esp_random
     char passBuf[9];
-    uint32_t randNum = esp_random() % 90000000 + 10000000;
+    uint32_t randNum = (esp_random() % 90000000) + 10000000;
     snprintf(passBuf, sizeof(passBuf), "%08u", randNum);
     _portalPassword = String(passBuf);
 
