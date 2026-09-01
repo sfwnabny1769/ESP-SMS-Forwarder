@@ -618,12 +618,26 @@ int GSMManager::getSignal() {
 }
 
 String GSMManager::getOperator() {
+    // Minta format pendek resmi (Short Alphanumeric Format 1) dari BTS provider
+    sendCommand("AT+COPS=3,1", 1000);
     String resp = sendCommand("AT+COPS?", 2000);
+    
     int idx = resp.indexOf("\"");
     if (idx != -1) {
         int endIdx = resp.indexOf("\"", idx + 1);
         if (endIdx != -1) {
-            return resp.substring(idx + 1, endIdx);
+            String op = resp.substring(idx + 1, endIdx);
+            op.toUpperCase();
+            op.trim();
+
+            // Smart Provider Name Normalizer ke 4-5 huruf
+            if (op.startsWith("TELKOM") || op.indexOf("TSEL") != -1) return "TSEL";
+            if (op.startsWith("INDO") || op.indexOf("ISAT") != -1 || op.indexOf("IM3") != -1) return "ISAT";
+            if (op.indexOf("XL") != -1 || op.indexOf("AXIS") != -1) return "XL";
+            if (op.indexOf("3") != -1 || op.indexOf("TRI") != -1 || op.indexOf("THREE") != -1) return "TRI";
+            if (op.startsWith("SMART")) return "SMART";
+
+            return op.length() > 5 ? op.substring(0, 5) : op;
         }
     }
     return "UNKNOWN";
