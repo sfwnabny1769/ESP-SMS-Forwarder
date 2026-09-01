@@ -36,6 +36,7 @@ int totalSmsReceived = 0;
 float gsmVoltage = 0.0f;
 unsigned long bootButtonPressTime = 0;
 bool bootButtonHandled = false;
+bool portalDisplayShown = false;
 
 void setup() {
     Serial.begin(115200);
@@ -89,52 +90,66 @@ void loop() {
         if (v > 0.0f) gsmVoltage = v;
     }
 
-    // 2. Deteksi Tombol BOOT (Single Click = Wake Up OLED, Hold 3s = Web Portal)
-    if (digitalRead(SETUP_TRIGGER_PIN) == LOW) {
-        if (bootButtonPressTime == 0) {
-            bootButtonPressTime = currentMillis;
-            bootButtonHandled = false;
+    // 2. Mode Display Handler (Portal Mode vs Live Status Mode)
+    if (wifi.isPortalRunning()) {
+        if (!portalDisplayShown) {
+            portalDisplayShown = true;
+            Serial.printf("[OLED Portal] Menampilkan SSID: %s, PASS: %s, IP: %s\n",
+                          wifi.getPortalSSID().c_str(),
+                          wifi.getPortalPassword().c_str(),
+                          wifi.getAPIP().c_str());
+            display.showPortalMode(wifi.getPortalSSID(), wifi.getPortalPassword(), wifi.getAPIP());
         }
     } else {
-        if (bootButtonPressTime > 0) {
-            unsigned long pressDuration = currentMillis - bootButtonPressTime;
-            // Jika ditekan singkat (antara 50ms hingga 2500ms), bangunkan OLED
-            if (pressDuration >= 50 && pressDuration < 2500) {
-                Serial.println("[Button] Klik tombol BOOT terdeteksi: Menampilkan Status di Layar OLED.");
-                display.showStatus(
-                    wifi.isConnected(),
-                    wifi.isConnected() ? wifi.getIP() : "No WiFi",
-                    gsm.getSignal(),
-                    gsm.getOperator(),
-                    gsm.getSIMStatus(),
-                    gsm.getRegistrationStatus(),
-                    totalSmsReceived,
-                    telegram.isConfigured(),
-                    wifi.isServerSyncEnabled(),
-                    gsmVoltage,
-                    gsm.getSIMStatus() == "READY"
-                );
-            }
-            bootButtonPressTime = 0;
-        }
-    }
+        portalDisplayShown = false;
 
-    // Refresh data OLED berkala (tiap 1.5 detik) HANYA jika layar sedang menyala
-    if (display.isDisplayOn() && (currentMillis - lastDisplayRefresh >= 1500)) {
-        lastDisplayRefresh = currentMillis;
-        display.showStatus(
-            wifi.isConnected(),
-            wifi.isConnected() ? wifi.getIP() : "No WiFi",
-            gsm.getSignal(),
-            gsm.getOperator(),
-            gsm.getSIMStatus(),
-            gsm.getRegistrationStatus(),
-            totalSmsReceived,
-            telegram.isConfigured(),
-            wifi.isServerSyncEnabled(),
-            gsmVoltage,
-            gsm.getSIMStatus() == "READY"
-        );
+        // Deteksi Tombol BOOT (Single Click = Wake Up OLED)
+        if (digitalRead(SETUP_TRIGGER_PIN) == LOW) {
+            if (bootButtonPressTime == 0) {
+                bootButtonPressTime = currentMillis;
+                bootButtonHandled = false;
+            }
+        } else {
+            if (bootButtonPressTime > 0) {
+                unsigned long pressDuration = currentMillis - bootButtonPressTime;
+                // Jika ditekan singkat (antara 50ms hingga 2500ms), bangunkan OLED
+                if (pressDuration >= 50 && pressDuration < 2500) {
+                    Serial.println("[Button] Klik tombol BOOT terdeteksi: Menampilkan Status di Layar OLED.");
+                    display.showStatus(
+                        wifi.isConnected(),
+                        wifi.isConnected() ? wifi.getIP() : "No WiFi",
+                        gsm.getSignal(),
+                        gsm.getOperator(),
+                        gsm.getSIMStatus(),
+                        gsm.getRegistrationStatus(),
+                        totalSmsReceived,
+                        telegram.isConfigured(),
+                        wifi.isServerSyncEnabled(),
+                        gsmVoltage,
+                        gsm.getSIMStatus() == "READY"
+                    );
+                }
+                bootButtonPressTime = 0;
+            }
+        }
+
+        // Refresh data OLED berkala (tiap 1.5 detik) HANYA jika layar sedang menyala
+        if (display.isDisplayOn() && (currentMillis - lastDisplayRefresh >= 1500)) {
+            lastDisplayRefresh = currentMillis;
+            display.showStatus(
+                wifi.isConnected(),
+                wifi.isConnected() ? wifi.getIP() : "No WiFi",
+                gsm.getSignal(),
+                gsm.getOperator(),
+                gsm.getSIMStatus(),
+                gsm.getRegistrationStatus(),
+                totalSmsReceived,
+                telegram.isConfigured(),
+                wifi.isServerSyncEnabled(),
+                gsmVoltage,
+                gsm.getSIMStatus() == "READY"
+            );
+        }
     }
 
     // 3. [MODE 3] Heartbeat & Remote AT Console Loop

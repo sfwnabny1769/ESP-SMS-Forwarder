@@ -270,7 +270,7 @@ void DisplayManager::showNewSMS(String senderPhone, String messageSnippet) {
     _display.display();
 }
 
-void DisplayManager::showPortalMode(String apSSID, String apIP) {
+void DisplayManager::showPortalMode(String apSSID, String apPassword, String apIP) {
     if (!_isAvailable) return;
 
     wakeUp(300000); // 5 menit
@@ -279,22 +279,25 @@ void DisplayManager::showPortalMode(String apSSID, String apIP) {
     _display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
 
     _display.setTextSize(1);
-    _display.setCursor(10, 4);
-    _display.print("[ WEB CONFIG AP ]");
+    _display.setCursor(14, 4);
+    _display.print("[ CONFIG PORTAL ]");
     _display.drawLine(4, 14, 123, 14, SSD1306_WHITE);
 
-    _display.setCursor(4, 18);
+    _display.setCursor(4, 17);
     _display.print("SSID: ");
     _display.println(apSSID);
 
-    _display.setCursor(4, 30);
+    _display.setCursor(4, 28);
+    _display.print("PASS: ");
+    _display.println(apPassword);
+
+    _display.setCursor(4, 39);
     _display.print("IP  : ");
     _display.println(apIP);
 
-    _display.setCursor(4, 44);
-    _display.println("Buka di browser HP");
-    _display.setCursor(4, 54);
-    _display.println("Tahan 3s utk batal");
+    _display.drawLine(4, 49, 123, 49, SSD1306_WHITE);
+    _display.setCursor(10, 53);
+    _display.println("Hubungkan HP ke AP");
     _display.display();
 }
 

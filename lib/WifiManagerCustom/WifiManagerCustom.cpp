@@ -168,19 +168,26 @@ void WifiManagerCustom::startConfigPortal(bool autoTriggered) {
 
     String mac = WiFi.macAddress();
     mac.replace(":", "");
-    String apSSID = "ESP-SMS-" + mac.substring(mac.length() - 4);
+    _portalSSID = "ESP-SMS-" + mac.substring(mac.length() - 4);
+
+    // Generate Dynamic 8-Digit Random PIN Password via hardware esp_random
+    char passBuf[9];
+    uint32_t randNum = esp_random() % 90000000 + 10000000;
+    snprintf(passBuf, sizeof(passBuf), "%08u", randNum);
+    _portalPassword = String(passBuf);
 
     IPAddress apIP(192, 168, 4, 1);
     IPAddress netMsk(255, 255, 255, 0);
     WiFi.softAPConfig(apIP, apIP, netMsk);
-    WiFi.softAP(apSSID.c_str());
+    WiFi.softAP(_portalSSID.c_str(), _portalPassword.c_str());
 
     Serial.println("\n=======================================================");
     Serial.println("         🔥 WEB CONFIGURATION PORTAL AKTIF 🔥         ");
     Serial.println("=======================================================");
-    Serial.printf(" 1. Hubungkan HP / Laptop ke WiFi : %s\n", apSSID.c_str());
-    Serial.println(" 2. Buka browser dan ketik alamat : http://192.168.4.1");
-    Serial.println(" 3. Atur WiFi, Telegram Bot, dan Server Laravel");
+    Serial.printf(" 1. Hubungkan HP / Laptop ke WiFi : %s\n", _portalSSID.c_str());
+    Serial.printf(" 2. Masukkan Password WiFi       : %s\n", _portalPassword.c_str());
+    Serial.println(" 3. Buka browser dan ketik alamat : http://192.168.4.1");
+    Serial.println(" 4. Atur WiFi, Telegram Bot, dan Server Laravel");
     Serial.println("=======================================================\n");
 
     _dnsServer.start(53, "*", apIP);
