@@ -1,4 +1,5 @@
 #include "ApiClient.h"
+#include <WiFiClientSecure.h>
 
 ApiClient::ApiClient() {
     _baseUrl = "";
@@ -14,16 +15,30 @@ void ApiClient::begin(String baseUrl, String token) {
 }
 
 bool ApiClient::sendSMS(SMSMessage sms) {
-    if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("[API]\nSend SMS failed: WiFi Disconnected");
+    if (WiFi.status() != WL_CONNECTED || _baseUrl.length() == 0) {
+        Serial.println("[API]\nSend SMS failed: WiFi Disconnected / URL Belum Diatur");
         return false;
     }
 
     HTTPClient http;
     String endpoint = _baseUrl + "/api/sms";
 
-    Serial.println("[API]\nPOST...");
-    http.begin(endpoint);
+    bool isHttps = endpoint.startsWith("https://");
+    WiFiClientSecure secureClient;
+    WiFiClient plainClient;
+
+    if (isHttps) {
+        secureClient.setInsecure(); // Izinkan koneksi ke domain ngrok / custom web server
+        if (!http.begin(secureClient, endpoint)) {
+            Serial.println("[API] Gagal menginisialisasi HTTPS client.");
+            return false;
+        }
+    } else {
+        if (!http.begin(plainClient, endpoint)) {
+            Serial.println("[API] Gagal menginisialisasi HTTP client.");
+            return false;
+        }
+    }
 
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-Token", _token);
@@ -48,11 +63,11 @@ bool ApiClient::sendSMS(SMSMessage sms) {
     bool success = false;
 
     if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_CREATED) {
-        Serial.printf("[API]\nHTTP %d\n", httpCode);
+        Serial.printf("[API]\nHTTP %d (SMS Berhasil Diteruskan ke Laravel)\n", httpCode);
         success = true;
     } else {
         if (httpCode > 0) {
-            Serial.printf("[API]\nHTTP Error %d\n", httpCode);
+            Serial.printf("[API]\nHTTP Error %d: %s\n", httpCode, http.getString().c_str());
         } else {
             Serial.printf("[API]\nHTTP POST Connection Failed: %s\n", http.errorToString(httpCode).c_str());
         }
@@ -66,14 +81,28 @@ bool ApiClient::sendSMS(SMSMessage sms) {
 bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, String regStatus, String &outPendingCommand) {
     outPendingCommand = "";
 
-    if (WiFi.status() != WL_CONNECTED) {
+    if (WiFi.status() != WL_CONNECTED || _baseUrl.length() == 0) {
         return false;
     }
 
     HTTPClient http;
     String endpoint = _baseUrl + "/api/device/heartbeat";
 
-    http.begin(endpoint);
+    bool isHttps = endpoint.startsWith("https://");
+    WiFiClientSecure secureClient;
+    WiFiClient plainClient;
+
+    if (isHttps) {
+        secureClient.setInsecure(); // Izinkan koneksi ke domain ngrok / custom web server
+        if (!http.begin(secureClient, endpoint)) {
+            return false;
+        }
+    } else {
+        if (!http.begin(plainClient, endpoint)) {
+            return false;
+        }
+    }
+
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-Token", _token);
 
@@ -105,7 +134,13 @@ bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, Str
                 outPendingCommand.replace("\\\\", "\\");
             }
         }
-        Serial.printf("[API]\nHeartbeat HTTP %d\n", httpCode);
+        Serial.printf("[API] Heartbeat OK (HTTP %d)\n", httpCode);
+    } else {
+        if (httpCode > 0) {
+            Serial.printf("[API] Heartbeat Error HTTP %d: %s\n", httpCode, http.getString().c_str());
+        } else {
+            Serial.printf("[API] Heartbeat Gagal: %s\n", http.errorToString(httpCode).c_str());
+        }
     }
 
     http.end();
@@ -113,14 +148,28 @@ bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, Str
 }
 
 bool ApiClient::sendATResponse(String command, String response) {
-    if (WiFi.status() != WL_CONNECTED) {
+    if (WiFi.status() != WL_CONNECTED || _baseUrl.length() == 0) {
         return false;
     }
 
     HTTPClient http;
     String endpoint = _baseUrl + "/api/device/command-response";
 
-    http.begin(endpoint);
+    bool isHttps = endpoint.startsWith("https://");
+    WiFiClientSecure secureClient;
+    WiFiClient plainClient;
+
+    if (isHttps) {
+        secureClient.setInsecure();
+        if (!http.begin(secureClient, endpoint)) {
+            return false;
+        }
+    } else {
+        if (!http.begin(plainClient, endpoint)) {
+            return false;
+        }
+    }
+
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-Token", _token);
 
