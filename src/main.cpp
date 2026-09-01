@@ -172,6 +172,18 @@ void handleTelegramBotCommands() {
     }
 }
 
+TaskHandle_t telegramTaskHandle = NULL;
+
+//Deklarasikan Handle dan Fungsi Task
+void telegramBotTask(void *pvParameters) {
+    for (;;) {
+        if (wifi.isConnected() && telegram.isConfigured()) {
+            handleTelegramBotCommands();
+        }
+        vTaskDelay(pdMS_TO_TICKS(2500)); // Delay 2.5 detik untuk polling perintah bot
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     delay(1000);
@@ -207,6 +219,17 @@ void setup() {
                     wifi.getApiUrl().c_str());
     Serial.printf(" - OLED Display    : %s\n", display.isAvailable() ? "Aktif" : "Tidak Terdeteksi");
     Serial.println("[Setup] Info: Tekan BOOT 1x untuk lihat status di OLED, tahan 3s untuk Web Portal.\n");
+
+    // 6. [freeRTOS] jalankan telegram bot poller di core 0 sebaegai background task
+    xTaskCreatePinnedToCore(
+        telegramBotTask,      // Fungsi task
+        "TelegramBotTask",    // Nama task
+        8192,                 // Ukuran stack (8 KB untuk HTTPS SSL Handshake)
+        NULL,                 // Parameter task (tidak ada)
+        1,                    // Prioritas task
+        &telegramTaskHandle,  // Handle task
+        0                     // Jalankan di Core 0
+    );
 }
 
 void loop() {
@@ -423,11 +446,6 @@ void loop() {
         }
     }
 
-    // 6. [TELEGRAM BOT REMOTE CONTROL] Polling dan Eksekusi Perintah Telegram Bot
-    if (wifi.isConnected() && telegram.isConfigured() && (currentMillis - lastTelegramPoll >= TELEGRAM_POLL_INTERVAL)) {
-        lastTelegramPoll = currentMillis;
-        handleTelegramBotCommands();
-    }
 
     delay(10);
 }
