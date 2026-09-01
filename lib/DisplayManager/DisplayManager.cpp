@@ -107,10 +107,6 @@ void DisplayManager::drawLoadingCircle(int x, int y) {
 
 // 4. Gambar Ikon Pesawat Kertas Telegram (Tilted Top-Right)
 void DisplayManager::drawTelegramPlane(int x, int y) {
-    // Moncong atas kanan: (x+9, y+1)
-    // Sayap kiri: (x+1, y+5)
-    // Ekor bawah: (x+5, y+9)
-    // Lipatan tengah: (x+5, y+5)
     _display.drawLine(x + 9, y + 1, x + 1, y + 5, SSD1306_WHITE); // Tepi atas
     _display.drawLine(x + 9, y + 1, x + 5, y + 9, SSD1306_WHITE); // Tepi kanan
     _display.drawLine(x + 9, y + 1, x + 5, y + 5, SSD1306_WHITE); // Tulang tengah
@@ -119,7 +115,21 @@ void DisplayManager::drawTelegramPlane(int x, int y) {
     _display.drawPixel(x + 3, y + 5, SSD1306_WHITE);
 }
 
-// 5. Selector Area Sinyal
+// 5. Gambar Ikon Gear Mini ⚙️ (7x7)
+void DisplayManager::drawGearIcon(int x, int y) {
+    _display.drawCircle(x + 3, y + 3, 2, SSD1306_WHITE);
+    _display.drawPixel(x + 3, y, SSD1306_WHITE);     // Gigi atas
+    _display.drawPixel(x + 3, y + 6, SSD1306_WHITE); // Gigi bawah
+    _display.drawPixel(x, y + 3, SSD1306_WHITE);     // Gigi kiri
+    _display.drawPixel(x + 6, y + 3, SSD1306_WHITE); // Gigi kanan
+    _display.drawPixel(x + 1, y + 1, SSD1306_WHITE); // Sudut kiri atas
+    _display.drawPixel(x + 5, y + 1, SSD1306_WHITE); // Sudut kanan atas
+    _display.drawPixel(x + 1, y + 5, SSD1306_WHITE); // Sudut kiri bawah
+    _display.drawPixel(x + 5, y + 5, SSD1306_WHITE); // Sudut kanan bawah
+    _display.drawPixel(x + 3, y + 3, SSD1306_BLACK); // Lubang as tengah
+}
+
+// 6. Selector Area Sinyal
 void DisplayManager::drawSignalArea(int x, int y, int signalCsq, String simStatus, String regStatus) {
     bool isSimReady = (simStatus == "READY");
     bool isRegistered = isSimReady && (regStatus.indexOf("Registered") != -1 || signalCsq > 0);
@@ -153,7 +163,7 @@ void DisplayManager::showBootSplash() {
     _display.display();
 }
 
-void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, String regStatus, int smsCount, bool telegramConfigured, bool serverSyncEnabled) {
+void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, String regStatus, int smsCount, bool telegramConfigured, bool serverSyncEnabled, float voltage, bool isSystemOk) {
     if (!_isAvailable) return;
 
     wakeUp();
@@ -168,7 +178,6 @@ void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signal
     _display.setTextSize(1);
     _display.setCursor(15, 3);
     
-    // Teks Status Operator
     if (simStatus != "READY") {
         _display.print("NO-SIM");
     } else if (regStatus.indexOf("Registered") == -1 && signalCsq <= 0) {
@@ -208,11 +217,32 @@ void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signal
     _display.drawLine(0, 51, 127, 51, SSD1306_WHITE);
 
     // ==========================================
-    // 3. FOOTER BAR
+    // 3. FOOTER BAR (⚙️OK  4.18V  Up: 1h23m)
     // ==========================================
-    _display.setCursor(2, 54);
-    _display.print("Status: ");
-    _display.print(wifiConnected ? "Gateway Online" : "Waiting WiFi...");
+    drawGearIcon(2, 54);
+    _display.setCursor(12, 54);
+    _display.print(isSystemOk ? "OK" : "ERR");
+
+    // Tegangan / Voltage
+    _display.setCursor(33, 54);
+    if (voltage > 1.0f) {
+        _display.printf("%.2fV", voltage);
+    } else {
+        _display.print("V:--");
+    }
+
+    // Uptime Sistem
+    _display.setCursor(74, 54);
+    unsigned long sec = millis() / 1000;
+    if (sec < 60) {
+        _display.printf("Up:%lus", sec);
+    } else if (sec < 3600) {
+        _display.printf("Up:%lum", sec / 60);
+    } else if (sec < 86400) {
+        _display.printf("Up:%luh%lum", sec / 3600, (sec % 3600) / 60);
+    } else {
+        _display.printf("Up:%lud%luh", sec / 86400, (sec % 86400) / 3600);
+    }
 
     _display.display();
 }

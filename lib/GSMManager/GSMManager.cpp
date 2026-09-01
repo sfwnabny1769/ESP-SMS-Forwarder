@@ -662,3 +662,18 @@ String GSMManager::executeCustomAT(String command, uint32_t timeout) {
     command.trim();
     return sendCommand(command, timeout);
 }
+
+float GSMManager::getBatteryVoltage() {
+    String resp = sendCommand("AT+CBC", 1000);
+    int cbcIdx = resp.indexOf("+CBC:");
+    if (cbcIdx != -1) {
+        int lastComma = resp.lastIndexOf(',');
+        if (lastComma != -1) {
+            int mv = resp.substring(lastComma + 1).toInt();
+            if (mv >= 2000 && mv <= 4600) {
+                return (float)mv / 1000.0f;
+            }
+        }
+    }
+    return 0.0f;
+}

@@ -28,10 +28,12 @@ std::vector<QueuedSMS> failedQueue;
 unsigned long lastHeartbeatTime = 0;
 unsigned long lastRetryAttempt = 0;
 unsigned long lastDisplayRefresh = 0;
+unsigned long lastVoltageCheck = 0;
 const unsigned long RETRY_INTERVAL = 15000; // Coba kirim ulang setiap 15 detik
 const int MAX_RETRY_LIMIT = 5;              // Maksimal 5x percobaan sebelum ditandai gagal permanen
 
 int totalSmsReceived = 0;
+float gsmVoltage = 0.0f;
 unsigned long bootButtonPressTime = 0;
 bool bootButtonHandled = false;
 
@@ -80,6 +82,13 @@ void loop() {
 
     unsigned long currentMillis = millis();
 
+    // Query Tegangan Baterai / Power SIM800L setiap 20 detik secara berkala
+    if (currentMillis - lastVoltageCheck >= 20000 || gsmVoltage == 0.0f) {
+        lastVoltageCheck = currentMillis;
+        float v = gsm.getBatteryVoltage();
+        if (v > 0.0f) gsmVoltage = v;
+    }
+
     // 2. Deteksi Tombol BOOT (Single Click = Wake Up OLED, Hold 3s = Web Portal)
     if (digitalRead(SETUP_TRIGGER_PIN) == LOW) {
         if (bootButtonPressTime == 0) {
@@ -101,15 +110,17 @@ void loop() {
                     gsm.getRegistrationStatus(),
                     totalSmsReceived,
                     telegram.isConfigured(),
-                    wifi.isServerSyncEnabled()
+                    wifi.isServerSyncEnabled(),
+                    gsmVoltage,
+                    gsm.getSIMStatus() == "READY"
                 );
             }
             bootButtonPressTime = 0;
         }
     }
 
-    // Refresh data OLED berkala (tiap 2 detik) HANYA jika layar sedang menyala
-    if (display.isDisplayOn() && (currentMillis - lastDisplayRefresh >= 2000)) {
+    // Refresh data OLED berkala (tiap 1.5 detik) HANYA jika layar sedang menyala
+    if (display.isDisplayOn() && (currentMillis - lastDisplayRefresh >= 1500)) {
         lastDisplayRefresh = currentMillis;
         display.showStatus(
             wifi.isConnected(),
@@ -120,7 +131,9 @@ void loop() {
             gsm.getRegistrationStatus(),
             totalSmsReceived,
             telegram.isConfigured(),
-            wifi.isServerSyncEnabled()
+            wifi.isServerSyncEnabled(),
+            gsmVoltage,
+            gsm.getSIMStatus() == "READY"
         );
     }
 
