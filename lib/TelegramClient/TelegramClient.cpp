@@ -84,7 +84,7 @@ bool TelegramClient::sendMessageTo(String targetChatId, String htmlMessage) {
     }
 
     WiFiClientSecure client;
-    client.setCACert(TELEGRAM_ROOT_CA); // Verifikasi sertifikat TLS Root CA (CWE-295 Remediation)
+    client.setCACertBundle((const uint8_t*)1); // Verifikasi sertifikat TLS Root CA Bundle resmi (CWE-295 Remediation)
 
     HTTPClient https;
     https.setTimeout(5000);
@@ -130,7 +130,7 @@ std::vector<TelegramIncomingMessage> TelegramClient::getNewMessages() {
     }
 
     WiFiClientSecure client;
-    client.setCACert(TELEGRAM_ROOT_CA); // Verifikasi sertifikat TLS Root CA (CWE-295 Remediation)
+    client.setCACertBundle((const uint8_t*)1); // Verifikasi sertifikat TLS Root CA Bundle resmi (CWE-295 Remediation)
 
     HTTPClient https;
     https.setTimeout(4000); // 4 detik timeout non-blocking
