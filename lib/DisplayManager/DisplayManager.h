@@ -14,8 +14,11 @@ private:
     unsigned long _wakeUntil;
     unsigned long _timeoutMs;
 
+    void drawSignalArea(int x, int y, int signalCsq, String simStatus, String regStatus);
     void drawSignalBars(int x, int y, int signalCsq);
-    void drawWiFiIcon(int x, int y, bool connected);
+    void drawCrossIcon(int x, int y);
+    void drawLoadingCircle(int x, int y);
+    void drawTelegramPlane(int x, int y);
 
 public:
     DisplayManager();
@@ -31,7 +34,7 @@ public:
 
     // Tampilan Layar
     void showBootSplash();
-    void showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, int smsCount, String modeStr);
+    void showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, String regStatus, int smsCount, bool telegramConfigured, bool serverSyncEnabled);
     void showNewSMS(String senderPhone, String messageSnippet);
     void showPortalMode(String apSSID, String apIP);
     void showMessage(String title, String message, unsigned long wakeDurationMs = 5000);

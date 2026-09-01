@@ -35,16 +35,6 @@ int totalSmsReceived = 0;
 unsigned long bootButtonPressTime = 0;
 bool bootButtonHandled = false;
 
-// Helper untuk format string mode aktif (misal: "T+S" atau "TG" atau "SRV")
-String getActiveModeString() {
-    bool hasTg = telegram.isConfigured();
-    bool hasSrv = wifi.isServerSyncEnabled() && wifi.getApiUrl().length() > 0;
-    if (hasTg && hasSrv) return "T+S";
-    if (hasTg) return "TG";
-    if (hasSrv) return "SRV";
-    return "OFF";
-}
-
 void setup() {
     Serial.begin(115200);
     delay(1000);
@@ -108,8 +98,10 @@ void loop() {
                     gsm.getSignal(),
                     gsm.getOperator(),
                     gsm.getSIMStatus(),
+                    gsm.getRegistrationStatus(),
                     totalSmsReceived,
-                    getActiveModeString()
+                    telegram.isConfigured(),
+                    wifi.isServerSyncEnabled()
                 );
             }
             bootButtonPressTime = 0;
@@ -125,8 +117,10 @@ void loop() {
             gsm.getSignal(),
             gsm.getOperator(),
             gsm.getSIMStatus(),
+            gsm.getRegistrationStatus(),
             totalSmsReceived,
-            getActiveModeString()
+            telegram.isConfigured(),
+            wifi.isServerSyncEnabled()
         );
     }
 

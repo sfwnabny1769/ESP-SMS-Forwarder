@@ -9,10 +9,10 @@ bool DisplayManager::begin(int sdaPin, int sclPin, uint8_t i2cAddr, unsigned lon
     // Inisialisasi I2C Wire dengan Pin khusus ESP32-S3
     Wire.begin(sdaPin, sclPin);
 
-    // I2C Safe Probe: Cek apakah OLED benar-benar terhubung agar tidak hang jika kabel lepas
+    // I2C Safe Probe
     Wire.beginTransmission(i2cAddr);
     if (Wire.endTransmission() != 0) {
-        Serial.printf("[OLED] Display SSD1306 TIDAK terdeteksi pada I2C Address 0x%02X (SDA:%d, SCL:%d).\n", i2cAddr, sdaPin, sclPin);
+        Serial.printf("[OLED] Display SSD1306 TIDAK terdeteksi pada 0x%02X (SDA:%d, SCL:%d).\n", i2cAddr, sdaPin, sclPin);
         _isAvailable = false;
         return false;
     }
@@ -59,14 +59,13 @@ void DisplayManager::sleep() {
 void DisplayManager::update() {
     if (!_isAvailable) return;
 
-    // Cek apakah waktu aktif layar sudah habis (Smart Timeout)
     if (_isDisplayOn && _timeoutMs > 0 && millis() >= _wakeUntil) {
         sleep();
     }
 }
 
+// 1. Gambar Bar Sinyal CSQ (4 level bertingkat)
 void DisplayManager::drawSignalBars(int x, int y, int signalCsq) {
-    // Gambar 4 bar sinyal bertingkat
     int bars = 0;
     if (signalCsq >= 20) bars = 4;
     else if (signalCsq >= 15) bars = 3;
@@ -74,7 +73,7 @@ void DisplayManager::drawSignalBars(int x, int y, int signalCsq) {
     else if (signalCsq > 0)  bars = 1;
 
     for (int i = 0; i < 4; i++) {
-        int barHeight = (i + 1) * 2 + 2; // Tinggi bar 4, 6, 8, 10
+        int barHeight = (i + 1) * 2 + 2; // Tinggi bar: 4, 6, 8, 10
         int barY = y + (10 - barHeight);
         if (i < bars) {
             _display.fillRect(x + (i * 3), barY, 2, barHeight, SSD1306_WHITE);
@@ -84,13 +83,53 @@ void DisplayManager::drawSignalBars(int x, int y, int signalCsq) {
     }
 }
 
-void DisplayManager::drawWiFiIcon(int x, int y, bool connected) {
-    if (connected) {
-        _display.fillCircle(x + 4, y + 6, 2, SSD1306_WHITE);
-        _display.drawCircle(x + 4, y + 6, 5, SSD1306_WHITE);
+// 2. Gambar Ikon Silang (SIM Tidak Terpasang / UNKNOWN)
+void DisplayManager::drawCrossIcon(int x, int y) {
+    _display.drawRect(x, y + 1, 11, 10, SSD1306_WHITE);
+    _display.drawLine(x + 2, y + 3, x + 8, y + 8, SSD1306_WHITE);
+    _display.drawLine(x + 8, y + 3, x + 2, y + 8, SSD1306_WHITE);
+}
+
+// 3. Gambar Lingkaran Loading Berputar (SIM Ready tapi Searching Sinyal)
+void DisplayManager::drawLoadingCircle(int x, int y) {
+    int cx = x + 5;
+    int cy = y + 5;
+    _display.drawCircle(cx, cy, 4, SSD1306_WHITE);
+
+    // Animasi titik putar 8 frame
+    int frame = (millis() / 120) % 8;
+    const int8_t cosOffsets[8] = { 4,  3,  0, -3, -4, -3,  0,  3 };
+    const int8_t sinOffsets[8] = { 0,  3,  4,  3,  0, -3, -4, -3 };
+    int dotX = cx + cosOffsets[frame];
+    int dotY = cy + sinOffsets[frame];
+    _display.fillCircle(dotX, dotY, 1, SSD1306_WHITE);
+}
+
+// 4. Gambar Ikon Pesawat Kertas Telegram (Tilted Top-Right)
+void DisplayManager::drawTelegramPlane(int x, int y) {
+    // Moncong atas kanan: (x+9, y+1)
+    // Sayap kiri: (x+1, y+5)
+    // Ekor bawah: (x+5, y+9)
+    // Lipatan tengah: (x+5, y+5)
+    _display.drawLine(x + 9, y + 1, x + 1, y + 5, SSD1306_WHITE); // Tepi atas
+    _display.drawLine(x + 9, y + 1, x + 5, y + 9, SSD1306_WHITE); // Tepi kanan
+    _display.drawLine(x + 9, y + 1, x + 5, y + 5, SSD1306_WHITE); // Tulang tengah
+    _display.drawLine(x + 1, y + 5, x + 5, y + 5, SSD1306_WHITE); // Sayap kiri
+    _display.drawLine(x + 5, y + 9, x + 5, y + 5, SSD1306_WHITE); // Sayap kanan
+    _display.drawPixel(x + 3, y + 5, SSD1306_WHITE);
+}
+
+// 5. Selector Area Sinyal
+void DisplayManager::drawSignalArea(int x, int y, int signalCsq, String simStatus, String regStatus) {
+    bool isSimReady = (simStatus == "READY");
+    bool isRegistered = isSimReady && (regStatus.indexOf("Registered") != -1 || signalCsq > 0);
+
+    if (!isSimReady) {
+        drawCrossIcon(x, y);
+    } else if (!isRegistered || signalCsq <= 0 || signalCsq == 99) {
+        drawLoadingCircle(x, y);
     } else {
-        _display.drawLine(x, y + 2, x + 8, y + 10, SSD1306_WHITE);
-        _display.drawLine(x + 8, y + 2, x, y + 10, SSD1306_WHITE);
+        drawSignalBars(x, y, signalCsq);
     }
 }
 
@@ -114,30 +153,48 @@ void DisplayManager::showBootSplash() {
     _display.display();
 }
 
-void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, int smsCount, String modeStr) {
+void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, String regStatus, int smsCount, bool telegramConfigured, bool serverSyncEnabled) {
     if (!_isAvailable) return;
 
-    wakeUp(); // Perpanjang timer aktif layar
+    wakeUp();
 
     _display.clearDisplay();
 
-    // 1. Header Bar
-    drawSignalBars(2, 2, signalCsq);
+    // ==========================================
+    // 1. HEADER BAR (Sinyal/SIM di Kiri, Telegram di Kanan)
+    // ==========================================
+    drawSignalArea(1, 2, signalCsq, simStatus, regStatus);
+
     _display.setTextSize(1);
-    _display.setCursor(17, 3);
+    _display.setCursor(15, 3);
     
-    // Potong nama operator jika terlalu panjang
-    String shortOp = operatorName.length() > 6 ? operatorName.substring(0, 6) : operatorName;
-    _display.print(shortOp.length() > 0 ? shortOp : "NO-SIM");
+    // Teks Status Operator
+    if (simStatus != "READY") {
+        _display.print("NO-SIM");
+    } else if (regStatus.indexOf("Registered") == -1 && signalCsq <= 0) {
+        _display.print("SEARCH");
+    } else {
+        String shortOp = operatorName.length() > 5 ? operatorName.substring(0, 5) : operatorName;
+        _display.print(shortOp.length() > 0 ? shortOp : "GSM-OK");
+    }
 
-    drawWiFiIcon(75, 1, wifiConnected);
+    // Ikon Pesawat Telegram di Sisi Kanan (X: 74)
+    drawTelegramPlane(74, 2);
 
-    _display.setCursor(92, 3);
-    _display.printf("[%s]", modeStr.c_str());
+    _display.setCursor(87, 3);
+    if (!telegramConfigured) {
+        _display.print("OFF");
+    } else if (!wifiConnected) {
+        _display.print("NO-NET");
+    } else {
+        _display.print("OK");
+    }
 
     _display.drawLine(0, 14, 127, 14, SSD1306_WHITE);
 
-    // 2. Body Status
+    // ==========================================
+    // 2. BODY STATUS
+    // ==========================================
     _display.setCursor(2, 18);
     _display.print("IP : ");
     _display.println(wifiConnected ? ipAddress : "Disconnected");
@@ -150,7 +207,9 @@ void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signal
 
     _display.drawLine(0, 51, 127, 51, SSD1306_WHITE);
 
-    // 3. Footer Bar
+    // ==========================================
+    // 3. FOOTER BAR
+    // ==========================================
     _display.setCursor(2, 54);
     _display.print("Status: ");
     _display.print(wifiConnected ? "Gateway Online" : "Waiting WiFi...");
@@ -161,7 +220,7 @@ void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signal
 void DisplayManager::showNewSMS(String senderPhone, String messageSnippet) {
     if (!_isAvailable) return;
 
-    wakeUp(10000); // Nyalakan layar selama 10 detik
+    wakeUp(10000); // 10 detik
 
     _display.clearDisplay();
     _display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
@@ -176,7 +235,6 @@ void DisplayManager::showNewSMS(String senderPhone, String messageSnippet) {
     _display.println(senderPhone);
 
     _display.setCursor(4, 30);
-    // Potong cuplikan isi pesan maksimal 35 karakter
     String snippet = messageSnippet.length() > 35 ? messageSnippet.substring(0, 35) + "..." : messageSnippet;
     _display.println(snippet);
 
@@ -188,7 +246,7 @@ void DisplayManager::showNewSMS(String senderPhone, String messageSnippet) {
 void DisplayManager::showPortalMode(String apSSID, String apIP) {
     if (!_isAvailable) return;
 
-    wakeUp(300000); // Nyalakan layar selama mode portal (5 menit)
+    wakeUp(300000); // 5 menit
 
     _display.clearDisplay();
     _display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
