@@ -85,14 +85,14 @@ void DisplayManager::drawSignalBars(int x, int y, int signalCsq) {
 
 // 2. Gambar Ikon Silang (SIM Tidak Terpasang / UNKNOWN)
 void DisplayManager::drawCrossIcon(int x, int y) {
-    _display.drawRect(x, y + 1, 11, 10, SSD1306_WHITE);
-    _display.drawLine(x + 2, y + 3, x + 8, y + 8, SSD1306_WHITE);
-    _display.drawLine(x + 8, y + 3, x + 2, y + 8, SSD1306_WHITE);
+    _display.drawRect(x, y + 1, 10, 10, SSD1306_WHITE);
+    _display.drawLine(x + 2, y + 3, x + 7, y + 8, SSD1306_WHITE);
+    _display.drawLine(x + 7, y + 3, x + 2, y + 8, SSD1306_WHITE);
 }
 
 // 3. Gambar Lingkaran Loading Berputar (SIM Ready tapi Searching Sinyal)
 void DisplayManager::drawLoadingCircle(int x, int y) {
-    int cx = x + 5;
+    int cx = x + 4;
     int cy = y + 5;
     _display.drawCircle(cx, cy, 4, SSD1306_WHITE);
 
@@ -107,15 +107,31 @@ void DisplayManager::drawLoadingCircle(int x, int y) {
 
 // 4. Gambar Ikon Pesawat Kertas Telegram (Tilted Top-Right)
 void DisplayManager::drawTelegramPlane(int x, int y) {
-    _display.drawLine(x + 9, y + 1, x + 1, y + 5, SSD1306_WHITE); // Tepi atas
-    _display.drawLine(x + 9, y + 1, x + 5, y + 9, SSD1306_WHITE); // Tepi kanan
-    _display.drawLine(x + 9, y + 1, x + 5, y + 5, SSD1306_WHITE); // Tulang tengah
-    _display.drawLine(x + 1, y + 5, x + 5, y + 5, SSD1306_WHITE); // Sayap kiri
-    _display.drawLine(x + 5, y + 9, x + 5, y + 5, SSD1306_WHITE); // Sayap kanan
-    _display.drawPixel(x + 3, y + 5, SSD1306_WHITE);
+    _display.drawLine(x + 8, y + 1, x + 1, y + 4, SSD1306_WHITE); // Tepi atas
+    _display.drawLine(x + 8, y + 1, x + 4, y + 8, SSD1306_WHITE); // Tepi kanan
+    _display.drawLine(x + 8, y + 1, x + 4, y + 4, SSD1306_WHITE); // Tulang tengah
+    _display.drawLine(x + 1, y + 4, x + 4, y + 4, SSD1306_WHITE); // Sayap kiri
+    _display.drawLine(x + 4, y + 8, x + 4, y + 4, SSD1306_WHITE); // Sayap kanan
+    _display.drawPixel(x + 2, y + 5, SSD1306_WHITE);
 }
 
-// 5. Gambar Ikon Gear Mini ⚙️ (7x7)
+// 5. Gambar Ikon Kubus 3D Laravel (Isometric Favicon Cube 8x8)
+void DisplayManager::drawLaravelIcon(int x, int y) {
+    // Hexagon luar isometric
+    _display.drawLine(x + 4, y, x + 8, y + 2, SSD1306_WHITE);     // Top -> Top-Right
+    _display.drawLine(x + 8, y + 2, x + 8, y + 6, SSD1306_WHITE); // Top-Right -> Bottom-Right
+    _display.drawLine(x + 8, y + 6, x + 4, y + 8, SSD1306_WHITE); // Bottom-Right -> Bottom
+    _display.drawLine(x + 4, y + 8, x, y + 6, SSD1306_WHITE);     // Bottom -> Bottom-Left
+    _display.drawLine(x, y + 6, x, y + 2, SSD1306_WHITE);         // Bottom-Left -> Top-Left
+    _display.drawLine(x, y + 2, x + 4, y, SSD1306_WHITE);         // Top-Left -> Top
+
+    // Tulang 3D dalam (Origami Cube)
+    _display.drawLine(x + 4, y + 4, x + 4, y, SSD1306_WHITE);     // Center -> Top
+    _display.drawLine(x + 4, y + 4, x, y + 6, SSD1306_WHITE);     // Center -> Bottom-Left
+    _display.drawLine(x + 4, y + 4, x + 8, y + 6, SSD1306_WHITE); // Center -> Bottom-Right
+}
+
+// 6. Gambar Ikon Gear Mini ⚙️ (7x7)
 void DisplayManager::drawGearIcon(int x, int y) {
     _display.drawCircle(x + 3, y + 3, 2, SSD1306_WHITE);
     _display.drawPixel(x + 3, y, SSD1306_WHITE);     // Gigi atas
@@ -129,7 +145,7 @@ void DisplayManager::drawGearIcon(int x, int y) {
     _display.drawPixel(x + 3, y + 3, SSD1306_BLACK); // Lubang as tengah
 }
 
-// 6. Selector Area Sinyal
+// 7. Selector Area Sinyal
 void DisplayManager::drawSignalArea(int x, int y, int signalCsq, String simStatus, String regStatus) {
     bool isSimReady = (simStatus == "READY");
     bool isRegistered = isSimReady && (regStatus.indexOf("Registered") != -1 || signalCsq > 0);
@@ -163,45 +179,58 @@ void DisplayManager::showBootSplash() {
     _display.display();
 }
 
-void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, String regStatus, int smsCount, bool telegramConfigured, bool serverSyncEnabled, float voltage, bool isSystemOk) {
+void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, String regStatus, int smsCount, bool telegramConfigured, bool serverSyncEnabled, bool laravelConnected, float voltage, bool isSystemOk) {
     if (!_isAvailable || !_isDisplayOn) return;
 
     _display.clearDisplay();
 
-    // ==========================================
-    // 1. HEADER BAR (Sinyal/SIM di Kiri, Telegram di Kanan)
-    // ==========================================
+    // =========================================================================
+    // 1. HEADER BAR: [GSM Provider] | [✈️ Telegram] | [🔶 Laravel]
+    // =========================================================================
+    
+    // A. Sinyal GSM / SIM di Kiri (X: 1)
     drawSignalArea(1, 2, signalCsq, simStatus, regStatus);
 
     _display.setTextSize(1);
-    _display.setCursor(15, 3);
-    
+    _display.setCursor(14, 3);
     if (simStatus != "READY") {
         _display.print("NO-SIM");
     } else if (regStatus.indexOf("Registered") == -1 && signalCsq <= 0) {
         _display.print("SEARCH");
     } else {
-        String shortOp = operatorName.length() > 5 ? operatorName.substring(0, 5) : operatorName;
-        _display.print(shortOp.length() > 0 ? shortOp : "GSM-OK");
+        String shortOp = operatorName.length() > 4 ? operatorName.substring(0, 4) : operatorName;
+        _display.print(shortOp.length() > 0 ? shortOp : "GSM");
     }
 
-    // Ikon Pesawat Telegram di Sisi Kanan (X: 74)
-    drawTelegramPlane(74, 2);
-
-    _display.setCursor(87, 3);
+    // B. Telegram Cloud API di Tengah (X: 52)
+    drawTelegramPlane(52, 2);
+    _display.setCursor(63, 3);
     if (!telegramConfigured) {
         _display.print("OFF");
     } else if (!wifiConnected) {
-        _display.print("NO-NET");
+        _display.print("NC");
     } else {
         _display.print("OK");
     }
 
+    // C. Laravel REST API di Kanan (X: 89)
+    drawLaravelIcon(89, 2);
+    _display.setCursor(101, 3);
+    if (!serverSyncEnabled) {
+        _display.print("OFF");
+    } else if (!wifiConnected) {
+        _display.print("NC");
+    } else if (laravelConnected) {
+        _display.print("OK");
+    } else {
+        _display.print("ERR");
+    }
+
     _display.drawLine(0, 14, 127, 14, SSD1306_WHITE);
 
-    // ==========================================
+    // =========================================================================
     // 2. BODY STATUS
-    // ==========================================
+    // =========================================================================
     _display.setCursor(2, 18);
     _display.print("IP : ");
     _display.println(wifiConnected ? ipAddress : "Disconnected");
@@ -214,9 +243,9 @@ void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signal
 
     _display.drawLine(0, 51, 127, 51, SSD1306_WHITE);
 
-    // ==========================================
+    // =========================================================================
     // 3. FOOTER BAR (⚙️OK  4.18V  dd:hh:mm:ss)
-    // ==========================================
+    // =========================================================================
     drawGearIcon(1, 54);
     _display.setCursor(10, 54);
     _display.print(isSystemOk ? "OK" : "ERR");

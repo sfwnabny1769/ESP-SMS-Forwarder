@@ -34,6 +34,7 @@ const int MAX_RETRY_LIMIT = 5;              // Maksimal 5x percobaan sebelum dit
 
 int totalSmsReceived = 0;
 float gsmVoltage = 0.0f;
+bool isLaravelConnected = false;
 unsigned long bootButtonPressTime = 0;
 bool bootButtonHandled = false;
 bool portalDisplayShown = false;
@@ -126,6 +127,7 @@ void loop() {
                         totalSmsReceived,
                         telegram.isConfigured(),
                         wifi.isServerSyncEnabled(),
+                        isLaravelConnected,
                         gsmVoltage,
                         gsm.getSIMStatus() == "READY"
                     );
@@ -147,6 +149,7 @@ void loop() {
                 totalSmsReceived,
                 telegram.isConfigured(),
                 wifi.isServerSyncEnabled(),
+                isLaravelConnected,
                 gsmVoltage,
                 gsm.getSIMStatus() == "READY"
             );
@@ -165,6 +168,7 @@ void loop() {
             String pendingCmd = "";
 
             bool hbSuccess = api.heartbeat(signal, opName, simStatus, regStatus, pendingCmd);
+            isLaravelConnected = hbSuccess;
 
             if (hbSuccess && pendingCmd.length() > 0) {
                 Serial.println("\n[Remote Console] Menerima Perintah dari Web Laravel:");

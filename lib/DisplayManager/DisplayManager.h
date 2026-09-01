@@ -19,6 +19,7 @@ private:
     void drawCrossIcon(int x, int y);
     void drawLoadingCircle(int x, int y);
     void drawTelegramPlane(int x, int y);
+    void drawLaravelIcon(int x, int y);
     void drawGearIcon(int x, int y);
 
 public:
@@ -35,7 +36,7 @@ public:
 
     // Tampilan Layar
     void showBootSplash();
-    void showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, String regStatus, int smsCount, bool telegramConfigured, bool serverSyncEnabled, float voltage = 0.0f, bool isSystemOk = true);
+    void showStatus(bool wifiConnected, String ipAddress, int signalCsq, String operatorName, String simStatus, String regStatus, int smsCount, bool telegramConfigured, bool serverSyncEnabled, bool laravelConnected, float voltage = 0.0f, bool isSystemOk = true);
     void showNewSMS(String senderPhone, String messageSnippet);
     void showPortalMode(String apSSID, String apPassword, String apIP);
     void showMessage(String title, String message, unsigned long wakeDurationMs = 5000);
