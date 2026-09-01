@@ -217,32 +217,29 @@ void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signal
     _display.drawLine(0, 51, 127, 51, SSD1306_WHITE);
 
     // ==========================================
-    // 3. FOOTER BAR (⚙️OK  4.18V  Up: 1h23m)
+    // 3. FOOTER BAR (⚙️OK  4.18V  dd:hh:mm:ss)
     // ==========================================
-    drawGearIcon(2, 54);
-    _display.setCursor(12, 54);
+    drawGearIcon(1, 54);
+    _display.setCursor(10, 54);
     _display.print(isSystemOk ? "OK" : "ERR");
 
     // Tegangan / Voltage
-    _display.setCursor(33, 54);
+    _display.setCursor(26, 54);
     if (voltage > 1.0f) {
         _display.printf("%.2fV", voltage);
     } else {
         _display.print("V:--");
     }
 
-    // Uptime Sistem
-    _display.setCursor(74, 54);
-    unsigned long sec = millis() / 1000;
-    if (sec < 60) {
-        _display.printf("Up:%lus", sec);
-    } else if (sec < 3600) {
-        _display.printf("Up:%lum", sec / 60);
-    } else if (sec < 86400) {
-        _display.printf("Up:%luh%lum", sec / 3600, (sec % 3600) / 60);
-    } else {
-        _display.printf("Up:%lud%luh", sec / 86400, (sec % 86400) / 3600);
-    }
+    // Uptime Sistem (Format Presisi dd:hh:mm:ss)
+    unsigned long totalSec = millis() / 1000;
+    unsigned long days = totalSec / 86400;
+    unsigned long hours = (totalSec % 86400) / 3600;
+    unsigned long minutes = (totalSec % 3600) / 60;
+    unsigned long seconds = totalSec % 60;
+
+    _display.setCursor(61, 54);
+    _display.printf("%02lu:%02lu:%02lu:%02lu", days, hours, minutes, seconds);
 
     _display.display();
 }
