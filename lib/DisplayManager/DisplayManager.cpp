@@ -115,20 +115,15 @@ void DisplayManager::drawTelegramPlane(int x, int y) {
     _display.drawPixel(x + 2, y + 5, SSD1306_WHITE);
 }
 
-// 5. Gambar Ikon Kubus 3D Laravel (Isometric Favicon Cube 8x8)
-void DisplayManager::drawLaravelIcon(int x, int y) {
-    // Hexagon luar isometric
-    _display.drawLine(x + 4, y, x + 8, y + 2, SSD1306_WHITE);     // Top -> Top-Right
-    _display.drawLine(x + 8, y + 2, x + 8, y + 6, SSD1306_WHITE); // Top-Right -> Bottom-Right
-    _display.drawLine(x + 8, y + 6, x + 4, y + 8, SSD1306_WHITE); // Bottom-Right -> Bottom
-    _display.drawLine(x + 4, y + 8, x, y + 6, SSD1306_WHITE);     // Bottom -> Bottom-Left
-    _display.drawLine(x, y + 6, x, y + 2, SSD1306_WHITE);         // Bottom-Left -> Top-Left
-    _display.drawLine(x, y + 2, x + 4, y, SSD1306_WHITE);         // Top-Left -> Top
-
-    // Tulang 3D dalam (Origami Cube)
-    _display.drawLine(x + 4, y + 4, x + 4, y, SSD1306_WHITE);     // Center -> Top
-    _display.drawLine(x + 4, y + 4, x, y + 6, SSD1306_WHITE);     // Center -> Bottom-Left
-    _display.drawLine(x + 4, y + 4, x + 8, y + 6, SSD1306_WHITE); // Center -> Bottom-Right
+// 5. Gambar Ikon Globe / Web Server 🌐 (8x8 Vector)
+void DisplayManager::drawGlobeIcon(int x, int y) {
+    _display.drawCircle(x + 4, y + 4, 4, SSD1306_WHITE);
+    _display.drawFastHLine(x + 1, y + 4, 7, SSD1306_WHITE);
+    _display.drawFastVLine(x + 4, y + 1, 7, SSD1306_WHITE);
+    _display.drawPixel(x + 2, y + 2, SSD1306_WHITE);
+    _display.drawPixel(x + 6, y + 2, SSD1306_WHITE);
+    _display.drawPixel(x + 2, y + 6, SSD1306_WHITE);
+    _display.drawPixel(x + 6, y + 6, SSD1306_WHITE);
 }
 
 // 6. Gambar Ikon Gear Mini ⚙️ (7x7)
@@ -213,8 +208,8 @@ void DisplayManager::showStatus(bool wifiConnected, String ipAddress, int signal
         _display.print("OK");
     }
 
-    // C. Laravel REST API di Kanan (X: 89)
-    drawLaravelIcon(89, 2);
+    // C. Web Server / Laravel REST API di Kanan (X: 89)
+    drawGlobeIcon(89, 2);
     _display.setCursor(101, 3);
     if (!serverSyncEnabled) {
         _display.print("OFF");

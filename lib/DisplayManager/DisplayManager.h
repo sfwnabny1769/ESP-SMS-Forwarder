@@ -19,7 +19,7 @@ private:
     void drawCrossIcon(int x, int y);
     void drawLoadingCircle(int x, int y);
     void drawTelegramPlane(int x, int y);
-    void drawLaravelIcon(int x, int y);
+    void drawGlobeIcon(int x, int y);
     void drawGearIcon(int x, int y);
 
 public:
