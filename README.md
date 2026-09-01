@@ -302,5 +302,32 @@ php artisan test --filter=AuthTest
 
 ---
 
+## 🌐 Panduan Deployment & Simulasi Remote Cloud
+
+Untuk menguji komunikasi ESP32 ke backend Laravel melalui internet publik (HTTPS):
+
+### 1. Rekomendasi: Gunakan Cloudflare Tunnel (Quick Tunnel)
+* **Mengapa Cloudflare Tunnel?**  
+  Cloudflare Tunnel menggunakan sertifikat SSL RSA standar yang ringan (~1.5 KB) dan bebas dari halaman peringatan (*interstitial warning page*), sehingga sangat ramah untuk buffer memori TLS mikrokontroler ESP32 (`mbedTLS`).
+* **Cara Menjalankan:**
+  ```bash
+  # Terminal 1 (Laravel Server):
+  php artisan serve --port=8000
+
+  # Terminal 2 (Cloudflare Quick Tunnel):
+  npx untun tunnel --port 8000
+  # atau
+  cloudflared tunnel --url http://localhost:8000
+  ```
+* Masukkan URL yang dihasilkan (`https://xxxx.trycloudflare.com`) ke Web Config Portal ESP32 (`192.168.4.1`).
+
+### 2. Catatan Khusus Mengenai Ngrok Free Tier
+* **Batasan Teknis Ngrok Free:**  
+  Ngrok Free Tier menggunakan sertifikat *Wildcard ECDSA P-384* dengan ukuran rantai sertifikat besar (~4.5 KB) serta proteksi *warning interstitial*. Pada mikrokontroler ESP32 dengan alokasi buffer mbedTLS default (4 KB), jabat tangan TLS ke domain `*.ngrok-free.dev` / `*.ngrok-free.app` dapat mengalami `MBEDTLS_ERR_SSL_CONN_EOF (-29312)`.
+* **Solusi Produksi:** Di server nyata (*production* VPS / PaaS seperti Railway, Render, DigitalOcean), gunakan sertifikat SSL standar (Let's Encrypt / DigiCert) yang didukung penuh secara *out-of-the-box* oleh ESP32.
+
+---
+
 ## 📝 License
 Proyek ini dikembangkan dengan lisensi MIT.
+
