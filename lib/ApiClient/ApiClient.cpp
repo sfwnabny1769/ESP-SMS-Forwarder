@@ -21,6 +21,7 @@ bool ApiClient::sendSMS(SMSMessage sms) {
     }
 
     HTTPClient http;
+    http.setTimeout(8000);
     String endpoint = _baseUrl + "/api/sms";
 
     bool isHttps = endpoint.startsWith("https://");
@@ -29,6 +30,7 @@ bool ApiClient::sendSMS(SMSMessage sms) {
 
     if (isHttps) {
         secureClient.setInsecure(); // Izinkan koneksi ke domain ngrok / custom web server
+        secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
             Serial.println("[API] Gagal menginisialisasi HTTPS client.");
             return false;
@@ -42,6 +44,8 @@ bool ApiClient::sendSMS(SMSMessage sms) {
 
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-Token", _token);
+    http.addHeader("ngrok-skip-browser-warning", "true");
+    http.addHeader("User-Agent", "ESP32-SMS-Gateway");
 
     String escapedMsg = sms.message;
     escapedMsg.replace("\\", "\\\\");
@@ -86,6 +90,7 @@ bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, Str
     }
 
     HTTPClient http;
+    http.setTimeout(8000);
     String endpoint = _baseUrl + "/api/device/heartbeat";
 
     bool isHttps = endpoint.startsWith("https://");
@@ -94,6 +99,7 @@ bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, Str
 
     if (isHttps) {
         secureClient.setInsecure(); // Izinkan koneksi ke domain ngrok / custom web server
+        secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
             return false;
         }
@@ -105,6 +111,8 @@ bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, Str
 
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-Token", _token);
+    http.addHeader("ngrok-skip-browser-warning", "true");
+    http.addHeader("User-Agent", "ESP32-SMS-Gateway");
 
     String escapedOp = operatorName;
     escapedOp.replace("\"", "\\\"");
@@ -153,6 +161,7 @@ bool ApiClient::sendATResponse(String command, String response) {
     }
 
     HTTPClient http;
+    http.setTimeout(8000);
     String endpoint = _baseUrl + "/api/device/command-response";
 
     bool isHttps = endpoint.startsWith("https://");
@@ -161,6 +170,7 @@ bool ApiClient::sendATResponse(String command, String response) {
 
     if (isHttps) {
         secureClient.setInsecure();
+        secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
             return false;
         }
@@ -172,6 +182,8 @@ bool ApiClient::sendATResponse(String command, String response) {
 
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-Token", _token);
+    http.addHeader("ngrok-skip-browser-warning", "true");
+    http.addHeader("User-Agent", "ESP32-SMS-Gateway");
 
     // Escape special characters in command & response
     String escCmd = command;
