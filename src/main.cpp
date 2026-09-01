@@ -29,8 +29,11 @@ unsigned long lastHeartbeatTime = 0;
 unsigned long lastRetryAttempt = 0;
 unsigned long lastDisplayRefresh = 0;
 unsigned long lastVoltageCheck = 0;
-const unsigned long RETRY_INTERVAL = 15000; // Coba kirim ulang setiap 15 detik
-const int MAX_RETRY_LIMIT = 5;              // Maksimal 5x percobaan sebelum ditandai gagal permanen
+unsigned long lastTelegramPoll = 0;
+
+const unsigned long RETRY_INTERVAL = 15000;         // Coba kirim ulang setiap 15 detik
+const unsigned long TELEGRAM_POLL_INTERVAL = 2500;  // Polling perintah bot setiap 2.5 detik
+const int MAX_RETRY_LIMIT = 5;                      // Maksimal 5x percobaan sebelum ditandai gagal permanen
 
 int totalSmsReceived = 0;
 float gsmVoltage = 0.0f;
@@ -39,6 +42,135 @@ unsigned long bootButtonPressTime = 0;
 bool bootButtonHandled = false;
 bool portalDisplayShown = false;
 String lastPortalSSID = "";
+
+// ============================================================================
+// Handler Perintah Kontrol Jarak Jauh (Telegram Bot Remote Control)
+// ============================================================================
+void handleTelegramBotCommands() {
+    if (!telegram.isConfigured() || !wifi.isConnected()) return;
+
+    std::vector<TelegramIncomingMessage> messages = telegram.getNewMessages();
+    for (const auto &msg : messages) {
+        // 1. Otorisasi Pengirim (Hanya Chat ID resmi yang diizinkan)
+        if (!telegram.isAuthorized(msg.chatId)) {
+            Serial.printf("[Telegram Security] ⛔ Akses Ditolak dari Chat ID: %s (Nama: %s) | Teks: %s\n",
+                          msg.chatId.c_str(), msg.senderName.c_str(), msg.text.c_str());
+            telegram.sendMessageTo(msg.chatId, "⛔ <b>Akses Ditolak</b>\nAnda tidak memiliki izin untuk mengontrol gateway ini.");
+            continue;
+        }
+
+        Serial.printf("\n[Telegram Command] Menerima Perintah dari %s (Chat ID: %s): %s\n",
+                      msg.senderName.c_str(), msg.chatId.c_str(), msg.text.c_str());
+
+        String cmd = msg.text;
+        cmd.trim();
+
+        // Bersihkan mention bot jika ada, contoh: /status@MyBot -> /status
+        int atIdx = cmd.indexOf('@');
+        if (atIdx != -1) {
+            cmd = cmd.substring(0, atIdx);
+        }
+
+        // ====================================================================
+        // Command Dispatcher
+        // ====================================================================
+        if (cmd.equalsIgnoreCase("/start") || cmd.equalsIgnoreCase("/help")) {
+            String helpText = "🤖 <b>ESP32 SMS GATEWAY COMMAND CENTER</b>\n";
+            helpText += "━━━━━━━━━━━━━━━━━━━━\n";
+            helpText += "📌 <b>Perintah Monitoring:</b>\n";
+            helpText += "/status - Status lengkap sistem & jaringan\n";
+            helpText += "/signal - Cek kuat sinyal (CSQ & dBm) + Operator\n";
+            helpText += "/voltage - Cek tegangan suplai daya SIM800L\n\n";
+            helpText += "⚡ <b>Perintah Kontrol:</b>\n";
+            helpText += "/sync_sms - Tarik seluruh SMS dari memori SIM\n";
+            helpText += "/restart_gsm - Re-inisialisasi modul SIM800L\n";
+            helpText += "/reboot - Restart chip ESP32 Gateway\n";
+            helpText += "/help - Tampilkan menu bantuan ini";
+            telegram.sendMessage(helpText);
+
+        } else if (cmd.equalsIgnoreCase("/status")) {
+            int signal = gsm.getSignal();
+            String op = gsm.getOperator();
+            String simStatus = gsm.getSIMStatus();
+            String regStatus = gsm.getRegistrationStatus();
+            String signalQuality = gsm.getSignalQualityText();
+            int dbm = (signal >= 2 && signal <= 30) ? (-113 + (signal * 2)) : -113;
+
+            unsigned long totalSec = millis() / 1000;
+            unsigned long days = totalSec / 86400;
+            unsigned long hours = (totalSec % 86400) / 3600;
+            unsigned long minutes = (totalSec % 3600) / 60;
+            unsigned long seconds = totalSec % 60;
+            char uptimeBuf[32];
+            snprintf(uptimeBuf, sizeof(uptimeBuf), "%02lud %02luh %02lum %02lus", days, hours, minutes, seconds);
+
+            String statusText = "📊 <b>STATUS SISTEM GATEWAY</b>\n";
+            statusText += "━━━━━━━━━━━━━━━━━━━━\n";
+            statusText += "📶 <b>Provider    :</b> " + op + "\n";
+            statusText += "📶 <b>Sinyal CSQ  :</b> " + String(signal) + "/31 (" + String(dbm) + " dBm) [" + signalQuality + "]\n";
+            statusText += "📱 <b>SIM Card    :</b> " + simStatus + " (" + regStatus + ")\n";
+            statusText += "⚡ <b>Tegangan GSM:</b> " + (gsmVoltage > 0 ? String(gsmVoltage, 2) + " V" : "Membaca...") + "\n";
+            statusText += "━━━━━━━━━━━━━━━━━━━━\n";
+            statusText += "🌐 <b>WiFi IP     :</b> " + wifi.getIP() + "\n";
+            statusText += "☁️ <b>Laravel API :</b> ";
+            statusText += (wifi.isServerSyncEnabled() ? (isLaravelConnected ? "Connected (OK)" : "Error / Unreachable") : "Non-aktif");
+            statusText += "\n";
+            statusText += "━━━━━━━━━━━━━━━━━━━━\n";
+            statusText += "📩 <b>Total SMS   :</b> " + String(totalSmsReceived) + " Diterima\n";
+            statusText += "⏳ <b>Retry Queue :</b> " + String(failedQueue.size()) + " Tertunda\n";
+            statusText += "⏱️ <b>Uptime      :</b> " + String(uptimeBuf) + "\n";
+            statusText += "⚙️ <b>Kondisi     :</b> Standby OK";
+            telegram.sendMessage(statusText);
+
+        } else if (cmd.equalsIgnoreCase("/signal") || cmd.equalsIgnoreCase("/csq")) {
+            int signal = gsm.getSignal();
+            String op = gsm.getOperator();
+            String regStatus = gsm.getRegistrationStatus();
+            String signalQuality = gsm.getSignalQualityText();
+            int dbm = (signal >= 2 && signal <= 30) ? (-113 + (signal * 2)) : -113;
+
+            String sigText = "📶 <b>INFORMASI SINYAL GSM</b>\n";
+            sigText += "━━━━━━━━━━━━━━━━━━━━\n";
+            sigText += "• <b>Operator :</b> " + op + "\n";
+            sigText += "• <b>Kuat CSQ :</b> " + String(signal) + " / 31\n";
+            sigText += "• <b>Desibel  :</b> " + String(dbm) + " dBm (" + signalQuality + ")\n";
+            sigText += "• <b>Jaringan :</b> " + regStatus;
+            telegram.sendMessage(sigText);
+
+        } else if (cmd.equalsIgnoreCase("/voltage") || cmd.equalsIgnoreCase("/baterai") || cmd.equalsIgnoreCase("/battery")) {
+            float v = gsm.getBatteryVoltage();
+            if (v > 0) gsmVoltage = v;
+
+            String voltText = "⚡ <b>STATUS TEGANGAN DAYA</b>\n";
+            voltText += "━━━━━━━━━━━━━━━━━━━━\n";
+            voltText += "• <b>Tegangan SIM800L:</b> " + (gsmVoltage > 0 ? String(gsmVoltage, 2) + " V" : "Gagal membaca") + "\n";
+            voltText += "• <b>Rekomendasi   :</b> 3.80 V - 4.20 V\n";
+            voltText += "• <b>Status        :</b> ";
+            voltText += (gsmVoltage >= 3.7f && gsmVoltage <= 4.4f ? "✅ Normal & Stabil" : "⚠️ Periksa Sumber Daya!");
+            telegram.sendMessage(voltText);
+
+        } else if (cmd.equalsIgnoreCase("/sync_sms") || cmd.equalsIgnoreCase("/pull_sms")) {
+            telegram.sendMessage("⏳ <i>Memulai penarikan seluruh SMS dari memori SIM card...</i>");
+            int pulledCount = gsm.syncStoredSMS(false);
+            telegram.sendMessage("📥 <b>Penarikan SMS Selesai</b>\nBerhasil menarik dan memproses <code>" + String(pulledCount) + "</code> pesan dari kartu SIM.");
+
+        } else if (cmd.equalsIgnoreCase("/restart_gsm") || cmd.equalsIgnoreCase("/reset_gsm")) {
+            telegram.sendMessage("🔄 <i>Menginisialisasi ulang modul GSM SIM800L...</i>");
+            gsm.begin(&Serial2, SIM800_RX, SIM800_TX, SIM800_BAUD);
+            telegram.sendMessage("✅ <b>Modul SIM800L Berhasil Diinisialisasi Ulang.</b>");
+
+        } else if (cmd.equalsIgnoreCase("/reboot") || cmd.equalsIgnoreCase("/restart")) {
+            telegram.sendMessage("⚠️ <b>Rebooting Gateway...</b>\nChip ESP32 sedang melakukan restart dalam 1 detik.");
+            delay(1000);
+            ESP.restart();
+
+        } else {
+            String unkText = "❓ <b>Perintah Tidak Dikenal:</b> <code>" + cmd + "</code>\n\n";
+            unkText += "Ketik /help untuk melihat daftar perintah yang tersedia.";
+            telegram.sendMessage(unkText);
+        }
+    }
+}
 
 void setup() {
     Serial.begin(115200);
@@ -289,6 +421,12 @@ void loop() {
                 Serial.printf("[Auto-Sweep] Ditemukan %d pesan tersimpan di SIM card. Memproses...\n", pulledCount);
             }
         }
+    }
+
+    // 6. [TELEGRAM BOT REMOTE CONTROL] Polling dan Eksekusi Perintah Telegram Bot
+    if (wifi.isConnected() && telegram.isConfigured() && (currentMillis - lastTelegramPoll >= TELEGRAM_POLL_INTERVAL)) {
+        lastTelegramPoll = currentMillis;
+        handleTelegramBotCommands();
     }
 
     delay(10);
