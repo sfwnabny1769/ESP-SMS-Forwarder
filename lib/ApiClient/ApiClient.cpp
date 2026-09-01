@@ -1,6 +1,9 @@
 #include "ApiClient.h"
 #include <WiFiClientSecure.h>
 
+// Definisi protokol ALPN untuk kompatibilitas Cloud Edge Proxy (Ngrok, Cloudflare, AWS)
+static const char *ALPN_HTTP11[] = {"http/1.1", NULL};
+
 ApiClient::ApiClient() {
     _baseUrl = "";
     _token = "";
@@ -29,7 +32,8 @@ bool ApiClient::sendSMS(SMSMessage sms) {
     WiFiClient plainClient;
 
     if (isHttps) {
-        secureClient.setInsecure(); // Izinkan koneksi ke domain ngrok / custom web server
+        secureClient.setInsecure(); // Izinkan HTTPS ke server dinamis / ngrok
+        secureClient.setAlpnProtocols(ALPN_HTTP11); // Negosiasi protokol HTTP/1.1 untuk Cloud Edge Proxy
         secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
             Serial.println("[API] Gagal menginisialisasi HTTPS client.");
@@ -46,6 +50,7 @@ bool ApiClient::sendSMS(SMSMessage sms) {
     http.addHeader("X-Device-Token", _token);
     http.addHeader("ngrok-skip-browser-warning", "true");
     http.addHeader("User-Agent", "ESP32-SMS-Gateway");
+    http.addHeader("Connection", "close");
 
     String escapedMsg = sms.message;
     escapedMsg.replace("\\", "\\\\");
@@ -98,7 +103,8 @@ bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, Str
     WiFiClient plainClient;
 
     if (isHttps) {
-        secureClient.setInsecure(); // Izinkan koneksi ke domain ngrok / custom web server
+        secureClient.setInsecure(); // Izinkan HTTPS ke server dinamis / ngrok
+        secureClient.setAlpnProtocols(ALPN_HTTP11); // Negosiasi protokol HTTP/1.1 untuk Cloud Edge Proxy
         secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
             return false;
@@ -113,6 +119,7 @@ bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, Str
     http.addHeader("X-Device-Token", _token);
     http.addHeader("ngrok-skip-browser-warning", "true");
     http.addHeader("User-Agent", "ESP32-SMS-Gateway");
+    http.addHeader("Connection", "close");
 
     String escapedOp = operatorName;
     escapedOp.replace("\"", "\\\"");
@@ -170,6 +177,7 @@ bool ApiClient::sendATResponse(String command, String response) {
 
     if (isHttps) {
         secureClient.setInsecure();
+        secureClient.setAlpnProtocols(ALPN_HTTP11);
         secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
             return false;
@@ -184,6 +192,7 @@ bool ApiClient::sendATResponse(String command, String response) {
     http.addHeader("X-Device-Token", _token);
     http.addHeader("ngrok-skip-browser-warning", "true");
     http.addHeader("User-Agent", "ESP32-SMS-Gateway");
+    http.addHeader("Connection", "close");
 
     // Escape special characters in command & response
     String escCmd = command;
