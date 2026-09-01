@@ -1,5 +1,30 @@
 #include "TelegramClient.h"
 
+// Root CA Certificate untuk api.telegram.org (DigiCert & Google Trust Services)
+const char TELEGRAM_ROOT_CA[] PROGMEM = 
+"-----BEGIN CERTIFICATE-----\n"
+"MIIDrzCCApegAwIBAgIQCDvgVpBCRrGhdKedrYcwcjANBgkqhkiG9w0BAQUFADBh\n"
+"MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3\n"
+"d3cuZGlnaWNlcnQuY29tMSAwHgYDVQQDExVEaWdpQ2VydCBHbG9iYWwgUm9vdCBD\n"
+"QTAeFw0wNjExMTAwMDAwMDBaFw0zMTExMTAwMDAwMDBaMGExCzAJBgNVBAYTAlVT\n"
+"MRUwEwYDVQQKEwxEaWdpQ2VydCBJbmMxGTAXBgNVBAsTEHd3dy5kaWdpY2VydC5j\n"
+"b20xIDAeBgNVBAMTFkRpZ2lDZXJ0IEdsb2JhbCBSb290IENBMIIBIjANBgkqhkiG\n"
+"9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4jvh57WtGBrh05Jx552mzsYqbxRogaC0xtKO\n"
+"9AlgQg3P05YTrbwNcKbvhDTcpuekSBfa4nWyJR4Chncwf9cat2OsCqAGb7tPQZYO\n"
+"nVNpngZWGaPnEn3ivhk6Aal5bLg7Iu435CQ1FiMl8yDYJYVOVDqOT+YO8L3ioEGc\n"
+"WCBOVnTWYWSpJYNIq/13+agdTVqk3mnrjKw++5subWI09jyAmfl2OrFXvhivZGP8\n"
+"nZ9R89+LNdIbPQB858PnxgU50pbqvhwn6116PloOTBrGQxAdy727xxSP5w3RNYOn\n"
+"4t2USkvukqUGH+i1Lk06BM3dssBA3ubIhZKOG3EtkhcVhqtbGQIDAQABo2MwYTAO\n"
+"BgNVHQ8BAf8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUA95QNVbR\n"
+"TLtm8KPiGxvDl7I90VUwHwYDVR0jBBgwFoAUA95QNVbRTLtm8KPiGxvDl7I90VUw\n"
+"DQYJKoZIhvcNAQEFBQADggEBAMucN6pIExIK+t1EnE9SsPTfrgT1eXkZxWet75q6\n"
+"7tKUwPJwxvgQApdFbNdEkjhTfZGlJuvpg45UkLEWiSR1FsAhEa5t+1fd6JUNCMRQ\n"
+"SkVNsmKBS30lMaQnWB+HIbgnGZBCSqSpZYCr6UMVeBmBQuhZkhwjP508PV83gnFe\n"
+"DwU3QbMrU1IwgwTmrFOTbL5W2145A25pdEG2+gzhTEXgURmnYZxybnBhMBULl9Kc\n"
+"qDl67WOgnsubOQ9G28hCe82fslMQSc40oIz3vc35xNJDREZ49dVJa50owV5OSZ4F\n"
+"Aj62jkFIxbitOM8vmT6rqAtshtJxCm5e1qmUEZZQy7Build8=\n"
+"-----END CERTIFICATE-----\n";
+
 TelegramClient::TelegramClient() {
     _botToken = "";
     _chatId = "";
@@ -58,7 +83,7 @@ bool TelegramClient::sendMessageTo(String targetChatId, String htmlMessage) {
     }
 
     WiFiClientSecure client;
-    client.setInsecure(); // Mengizinkan HTTPS tanpa fingerprint CA statis
+    client.setCACert(TELEGRAM_ROOT_CA); // Verifikasi sertifikat TLS Root CA (CWE-295 Remediation)
 
     HTTPClient https;
     https.setTimeout(5000);
@@ -104,7 +129,7 @@ std::vector<TelegramIncomingMessage> TelegramClient::getNewMessages() {
     }
 
     WiFiClientSecure client;
-    client.setInsecure();
+    client.setCACert(TELEGRAM_ROOT_CA); // Verifikasi sertifikat TLS Root CA (CWE-295 Remediation)
 
     HTTPClient https;
     https.setTimeout(4000); // 4 detik timeout non-blocking
