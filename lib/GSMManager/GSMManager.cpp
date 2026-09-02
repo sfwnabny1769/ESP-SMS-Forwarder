@@ -4,6 +4,11 @@ GSMManager::GSMManager() {
     _serial = nullptr;
     _rxPin = 16;
     _txPin = 17;
+    _rstPin = -1;
+    _dtrPin = -1;
+    _riPin = -1;
+    _riTriggered = false;
+    _isSleeping = false;
     _baudRate = 9600;
     _state = GSM_STATE_UNINITIALIZED;
     _lastStateTimer = 0;
@@ -16,18 +21,44 @@ GSMManager::GSMManager() {
     _hasAnnouncedRegistration = false;
 }
 
-bool GSMManager::begin(HardwareSerial* serialPort, int rxPin, int txPin, long baudRate) {
+bool GSMManager::begin(HardwareSerial* serialPort, int rxPin, int txPin, long baudRate, int rstPin, int dtrPin, int riPin) {
     _serial = serialPort;
     _rxPin = rxPin;
     _txPin = txPin;
     _baudRate = baudRate;
+    _rstPin = rstPin;
+    _dtrPin = dtrPin;
+    _riPin = riPin;
+    _riTriggered = false;
+    _isSleeping = false;
+
+    //inisiasi pin RST jika dikonfigurasi
+    if (_rstPin >= 0) {
+        pinMode(_rstPin, OUTPUT);
+        digitalWrite(_rstPin, HIGH); // Inactive state (Active Low)
+    }
+
+    //inisiasi pin DTR jika dikonfigurasi
+    if (_dtrPin >= 0) {
+        pinMode(_dtrPin, OUTPUT);
+        digitalWrite(_dtrPin, LOW); // DTR LOW = Wake up saat boot
+    }
+
+    //inisiasi pin RI jika dikonfigurasi
+    if (_riPin >= 0) {
+        pinMode(_riPin, INPUT_PULLUP);
+    }
 
     _serial->begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
     
-    Serial.println("\n[GSM Boot] ==================================================");
-    Serial.println("[GSM Boot] Inisialisasi Serial GSM SIM800L (Baud: 9600)...");
-    Serial.println("[GSM Boot] ==================================================");
-    _state = GSM_STATE_CHECK_AT;
+    Serial.println("\n[GSM Boot] ==================================================");                                              
+    Serial.println("[GSM Boot] Inisialisasi Serial GSM SIM800L (Baud: 9600)...");                                                   
+    if (_rstPin >= 0) Serial.printf("[GSM Boot]  - Pin Hardware Reset (RST): GPIO %d\n", _rstPin);                                  
+    if (_dtrPin >= 0) Serial.printf("[GSM Boot]  - Pin Sleep/Wake (DTR)    : GPIO %d\n", _dtrPin);                                  
+    if (_riPin >= 0)  Serial.printf("[GSM Boot]  - Pin Ring Indicator (RI) : GPIO %d\n", _riPin);                                   
+    Serial.println("[GSM Boot] ==================================================");                                                
+                                                                                                                                    
+    _state = GSM_STATE_CHECK_AT;                                                                                                    
     _lastStateTimer = millis();
 
     return true;
@@ -35,7 +66,12 @@ bool GSMManager::begin(HardwareSerial* serialPort, int rxPin, int txPin, long ba
 
 String GSMManager::sendCommand(String command, uint32_t timeout) {
     if (!_serial) return "";
-
+    
+    //Bangunkan modem otomatis jika dalam mode sleep
+    if (_isSleeping && !command.startsWith("AT+CSCLK")) {                                                                           
+        wakeUp();                                                                                                                   
+    } 
+    
     // Clear input buffer
     while (_serial->available()) {
         _serial->read();
@@ -691,3 +727,61 @@ float GSMManager::getBatteryVoltage() {
     }
     return 0.0f;
 }
+
+void GSMManager::hardwareReset() {                                                                                                  
+    if (_rstPin < 0) {                                                                                                              
+        Serial.println("[GSM Reset] Pin Hardware RST tidak dikonfigurasi.");                                                        
+        return;                                                                                                                     
+    }                                                                                                                               
+    Serial.println("\n[GSM Reset] Memicu Hardware Reset SIM800L (RST LOW 120ms)...");                                            
+    digitalWrite(_rstPin, LOW);                                                                                                     
+    delay(120);                                                                                                                     
+    digitalWrite(_rstPin, HIGH);                                                                                                    
+    delay(2000); // Beri waktu modem re-booting internal                                                                            
+                                                                                                                                    
+    _state = GSM_STATE_CHECK_AT;                                                                                                    
+    _lastStateTimer = millis();                                                                                                     
+    _hasAnnouncedRegistration = false;                                                                                              
+    _isSleeping = false;                                                                                                            
+    if (_dtrPin >= 0) digitalWrite(_dtrPin, LOW);                                                                                   
+    Serial.println("[GSM Reset] Modem Berhasil Di-reset via Hardware.");                                                         
+}                                                                                                                                   
+                                                                                                                                    
+void GSMManager::setSleepMode(bool enable) {                                                                                        
+    _isSleeping = enable;                                                                                                           
+    if (_dtrPin >= 0) {                                                                                                             
+        if (enable) {                                                                                                               
+            sendCommand("AT+CSCLK=1", 1000); // Aktifkan mode DTR sleep                                                             
+            digitalWrite(_dtrPin, HIGH);       // DTR HIGH = SIM800L Masuk Mode Sleep                                               
+            Serial.println("[GSM Power] SIM800L memasuki mode Hemat Daya (DTR HIGH / CSCLK=1).");                                   
+        } else {                                                                                                                    
+            digitalWrite(_dtrPin, LOW);        // DTR LOW = Bangunkan SIM800L                                                       
+            delay(50);                         // Jeda stabilisasi serial clock                                                     
+            Serial.println("[GSM Power] SIM800L Bangun dari Mode Sleep (DTR LOW).");                                                
+        }                                                                                                                           
+    } else {                                                                                                                        
+        if (enable) {                                                                                                               
+            sendCommand("AT+CSCLK=2", 1000); // Auto-sleep tanpa DTR (bangun via serial)                                            
+        } else {                                                                                                                    
+            sendCommand("AT", 500);          // Bangunkan via karakter dummy                                                        
+        }                                                                                                                           
+    }                                                                                                                               
+}                                                                                                                                   
+                                                                                                                                    
+void GSMManager::wakeUp() {                                                                                                         
+    if (_isSleeping) {                                                                                                              
+        setSleepMode(false);                                                                                                        
+    }                                                                                                                               
+}                                                                                                                                   
+                                                                                                                                    
+void GSMManager::notifyRingInterrupt() {                                                                                            
+    _riTriggered = true;                                                                                                            
+}                                                                                                                                   
+                                                                                                                                    
+bool GSMManager::isRingTriggered() {                                                                                                
+    return _riTriggered;                                                                                                            
+}                                                                                                                                   
+                                                                                                                                    
+void GSMManager::clearRingTrigger() {                                                                                               
+    _riTriggered = false;                                                                                                           
+} 

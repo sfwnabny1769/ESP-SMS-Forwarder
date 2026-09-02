@@ -28,6 +28,9 @@ struct QueuedSMS {
 // Antrean penampung SMS yang gagal terkirim (Offline Retry Queue)
 std::vector<QueuedSMS> failedQueue;
 
+int gsmConsecutiveFailures = 0;
+const int MAX_GSM_FAILURES_BEFORE_HARDWARE_RESET = 3; // Batas kegagalan berturut-turut sebelum reset modem
+
 unsigned long lastHeartbeatTime = 0;
 unsigned long lastRetryAttempt = 0;
 unsigned long lastDisplayRefresh = 0;
@@ -118,22 +121,31 @@ void handleTelegramBotCommands() {
             char uptimeBuf[32];
             snprintf(uptimeBuf, sizeof(uptimeBuf), "%02lud %02luh %02lum %02lus", days, hours, minutes, seconds);
 
-            String statusText = "📊 <b>STATUS SISTEM GATEWAY</b>\n";
-            statusText += "━━━━━━━━━━━━━━━━━━━━\n";
-            statusText += "📶 <b>Provider    :</b> " + op + "\n";
-            statusText += "📶 <b>Sinyal CSQ  :</b> " + String(signal) + "/31 (" + String(dbm) + " dBm) [" + signalQuality + "]\n";
-            statusText += "📱 <b>SIM Card    :</b> " + simStatus + " (" + regStatus + ")\n";
-            statusText += "⚡ <b>Tegangan GSM:</b> " + (currentVoltage > 0 ? String(currentVoltage, 2) + " V" : "Membaca...") + "\n";
-            statusText += "━━━━━━━━━━━━━━━━━━━━\n";
-            statusText += "🌐 <b>WiFi IP     :</b> " + wifi.getIP() + "\n";
-            statusText += "☁️ <b>Laravel API :</b> ";
+            float chipTemp = temperatureRead();
+            uint32_t totalHeap = ESP.getHeapSize() / 1024;
+            uint32_t freeHeap = ESP.getFreeHeap() / 1024;
+            uint32_t usedHeap = totalHeap - freeHeap;
+
+            String statusText = "<b>[ESP32 GATEWAY TASK MANAGER]</b>\n";
+            statusText += "------------------------------------\n";
+            statusText += "<b>CPU Clock   :</b> " + String(getCpuFrequencyMhz()) + " MHz\n";
+            statusText += "<b>Suhu Chip   :</b> " + String(chipTemp, 1) + " C\n";
+            statusText += "<b>RAM Usage   :</b> " + String(usedHeap) + " KB / " + String(totalHeap) + " KB (" + String(freeHeap) + " KB Free)\n";
+            statusText += "------------------------------------\n";
+            statusText += "<b>Provider    :</b> " + op + "\n";
+            statusText += "<b>Sinyal CSQ  :</b> " + String(signal) + "/31 (" + String(dbm) + " dBm) [" + signalQuality + "]\n";
+            statusText += "<b>SIM Card    :</b> " + simStatus + " (" + regStatus + ")\n";
+            statusText += "<b>Tegangan GSM:</b> " + (currentVoltage > 0 ? String(currentVoltage, 2) + " V" : "Membaca...") + "\n";
+            statusText += "------------------------------------\n";
+            statusText += "<b>WiFi IP     :</b> " + wifi.getIP() + "\n";
+            statusText += "<b>Laravel API :</b> ";
             statusText += (wifi.isServerSyncEnabled() ? (isLaravelConnected ? "Connected (OK)" : "Error / Unreachable") : "Non-aktif");
             statusText += "\n";
-            statusText += "━━━━━━━━━━━━━━━━━━━━\n";
-            statusText += "📩 <b>Total SMS   :</b> " + String(totalSms) + " Diterima\n";
-            statusText += "⏳ <b>Retry Queue :</b> " + String(queueSize) + " Tertunda\n";
-            statusText += "⏱️ <b>Uptime      :</b> " + String(uptimeBuf) + "\n";
-            statusText += "⚙️ <b>Kondisi     :</b> Standby OK";
+            statusText += "------------------------------------\n";
+            statusText += "<b>Total SMS   :</b> " + String(totalSms) + " Diterima\n";
+            statusText += "<b>Retry Queue :</b> " + String(queueSize) + " Tertunda\n";
+            statusText += "<b>Uptime      :</b> " + String(uptimeBuf) + "\n";
+            statusText += "<b>Kondisi     :</b> Eco-Standby Active";
             telegram.sendMessage(statusText);
 
         } else if (cmd.equalsIgnoreCase("/signal") || cmd.equalsIgnoreCase("/csq")) {
@@ -218,12 +230,22 @@ void telegramBotTask(void *pvParameters) {
 }
 
 void setup() {
+    //0. Turunkan frekuensi CPU ke 80 MHz (power safe dan dingin)
+    #ifdef GATEWAY_CPU_FREQ_MHZ
+    setCpuFrequencyMhz(GATEWAY_CPU_FREQ_MHZ);
+    #endif
+    
     Serial.begin(115200);
     delay(1000);
 
-    Serial.println("\n==================================================");
-    Serial.println("  ESP32-S3 SIM800L SMS Gateway (Tri-Mode Active)  ");
-    Serial.println("==================================================");
+    Serial.println("\n==================================================");                                                         
+    Serial.println("  ESP32-S3 SIM800L SMS Gateway (Eco-Mode Active)  ");                                                           
+    Serial.println("==================================================");                                                           
+    Serial.println("[Hardware Task Manager]");
+    Serial.printf(" - CPU Clock      : %d MHz\n", getCpuFrequencyMhz());
+    Serial.printf(" - Suhu Internal  : %.1f C\n", temperatureRead());
+    Serial.printf(" - Memory Heap    : %d KB Free / %d KB Total\n", ESP.getFreeHeap() / 1024, ESP.getHeapSize() / 1024);
+    Serial.printf(" - Flash Size     : %d MB\n", ESP.getFlashChipSize() / (1024 * 1024)); 
 
     // 0. Inisialisasi FreeRTOS Mutex untuk Sinkronisasi Thread-Safe
     gsmMutex = xSemaphoreCreateMutex();
@@ -234,8 +256,21 @@ void setup() {
     // 2. [MODE 2] Inisialisasi WiFi & Web Server on Chip (Membaca NVS Flash)
     wifi.begin();
 
+    // Aktifkan WiFi Modem-Sleep Protocol (Hemat Arus WiFi dari 120mA -> 15mA)                                                      
+    WiFi.setSleep(WIFI_PS_MIN_MODEM);                                                                                               
+    Serial.println("[Power] WiFi Modem-Sleep Protocol (DTIM) Diaktifkan."); 
+
     // 3. [HARDWARE] Inisialisasi Modul GSM SIM800L
-    gsm.begin(&Serial2, SIM800_RX, SIM800_TX, SIM800_BAUD);
+    gsm.begin(&Serial2, SIM800_RX, SIM800_TX, SIM800_BAUD, SIM800_RST_PIN, SIM800_DTR_PIN, SIM800_RI_PIN);
+
+    // 3b. Pasang Hardware Interrupt untuk Pin RING/RI (Event-Driven SMS)                                                           
+    if (SIM800_RI_PIN >= 0) {                                                                                                       
+        pinMode(SIM800_RI_PIN, INPUT_PULLUP);                                                                                       
+        attachInterrupt(digitalPinToInterrupt(SIM800_RI_PIN), []() {                                                                
+            gsm.notifyRingInterrupt();                                                                                              
+        }, FALLING);                                                                                                                
+        Serial.println("[Hardware] Interrupt Pin RI (Ring Indicator) Diaktifkan.");                                                 
+    }  
 
     // 4. [MODE 1] Inisialisasi Direct Telegram Sender dari Flash NVS
     telegram.begin(wifi.getTelegramToken(), wifi.getTelegramChatId());
@@ -367,19 +402,34 @@ void loop() {
                 xSemaphoreGive(gsmMutex);
             }
         }
+
     }
 
     // 3. Operasi GSM & Forwarding Engine (Sinkronisasi Thread-Safe via gsmMutex)
     if (xSemaphoreTake(gsmMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         gsm.update();
 
-        // Query Tegangan Baterai / Power SIM800L setiap 20 detik secara berkala
-        if (currentMillis - lastVoltageCheck >= 20000 || gsmVoltage == 0.0f) {
-            lastVoltageCheck = currentMillis;
-            float v = gsm.getBatteryVoltage();
-            if (v > 0.0f) gsmVoltage = v;
-        }
-
+    // 1. Query Tegangan Baterai & Health Check SIM800L setiap 30 detik                                                         
+    if (currentMillis - lastVoltageCheck >= 30000 || gsmVoltage == 0.0f) {                                                      
+        lastVoltageCheck = currentMillis;                                                                                       
+        float v = gsm.getBatteryVoltage();                                                                                      
+                                                                                                                                
+        if (v > 0.0f) {                                                                                                         
+            gsmVoltage = v;                                                                                                     
+            gsmConsecutiveFailures = 0; // Komunikasi normal, reset counter                                                     
+        } else {                                                                                                                
+            gsmConsecutiveFailures++;                                                                                           
+            Serial.printf("[GSM Health Warning] Kegagalan komunikasi GSM #%d/%d.\n",                                            
+                            gsmConsecutiveFailures, MAX_GSM_FAILURES_BEFORE_HARDWARE_RESET);                                      
+                                                                                                                                
+            if (gsmConsecutiveFailures >= MAX_GSM_FAILURES_BEFORE_HARDWARE_RESET) {                                             
+                Serial.println("[GSM Recovery] ⚠️ Modem tidak merespon berturut-turut! Memicu HARDWARE RESET...");              
+                gsm.hardwareReset();                                                                                            
+                gsmConsecutiveFailures = 0;                                                                                     
+            }                                                                                                                   
+        }                                                                                                                       
+    }                                                                                                                           
+                
         // [MODE 3] Heartbeat & Remote AT Console Loop
         if (wifi.isServerSyncEnabled() && wifi.getApiUrl().length() > 0 && wifi.isConnected()) {
             if (currentMillis - lastHeartbeatTime >= HEARTBEAT_INTERVAL) {
@@ -494,18 +544,16 @@ void loop() {
                     }
                 }
             }
+        }
 
-            // Auto-Sweep: Cek jika ada SMS tersangkut di memori SIM
-            if (failedQueue.empty()) {
-                int pulledCount = gsm.syncStoredSMS(false);
-                if (pulledCount > 0) {
-                    Serial.printf("[Auto-Sweep] Ditemukan %d pesan tersimpan di SIM card. Memproses...\n", pulledCount);
-                }
-            }
+        // Deteksi Trigger Hardware Interrupt Pin RI (SMS Baru Masuk)
+        if (SIM800_RI_PIN >= 0 && gsm.isRingTriggered()) {
+            gsm.clearRingTrigger();
+            Serial.println("\n[Interrupt Event] 🔔 Sinyal Pulsa LOW dari Pin RI Terdeteksi (Ada Aktivitas SMS/Panggilan)!");
         }
 
         xSemaphoreGive(gsmMutex);
     }
 
-    delay(10);
+    delay(15);
 }

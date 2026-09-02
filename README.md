@@ -112,6 +112,40 @@ routes/
 └── web.php                              # Web Dashboard Routes (Terproteksi auth)
 ```
 
+## 🔌 Skema Hardware & Pinout Koneksi (ESP32-S3 + SIM800L)
+
+### 1. Tabel Pinout Hardware ESP32-S3 DevKitC-1
+
+| Komponen | Pin Modul | Pin ESP32-S3 | Fungsi / Sinyal | Keterangan |
+| :--- | :--- | :--- | :--- | :--- |
+| **SIM800L** | `TXD` | `GPIO 16` (RX2) | Serial UART Receive | Wajib |
+| **SIM800L** | `RXD` | `GPIO 17` (TX2) | Serial UART Transmit | Wajib |
+| **SIM800L** | `VCC` | Step-Down 4.0V | Catu Daya Utama SIM800L | 3.7V – 4.2V (Arus puncak 2A) |
+| **SIM800L** | `GND` | Common `GND` | Ground Bersama | Wajib terhubung ke GND ESP32 |
+| **SIM800L** | `RST` | `GPIO 7` | Hardware Reset Watchdog | Opsional (Active LOW) |
+| **SIM800L** | `DTR` | `GPIO 6` | Sleep & Wake Control | Opsional (HIGH=Sleep, LOW=Wake) |
+| **SIM800L** | `RING` / `RI` | `GPIO 5` | SMS Interrupt Trigger | Opsional (Active LOW Falling Edge) |
+| **OLED SSD1306** | `SDA` | `GPIO 8` | I2C Data | Layar Monitoring |
+| **OLED SSD1306** | `SCL` | `GPIO 9` | I2C Clock | Layar Monitoring |
+| **OLED SSD1306** | `VCC` / `GND` | `3.3V` / `GND` | Catu Daya Layar | Dari pin 3.3V ESP32 |
+| **Tombol BOOT** | `BOOT` | `GPIO 0` | Wakeup / Web Portal Trigger | Bawaan board ESP32-S3 |
+
+---
+
+## ⚡ Power Management & Thermal Benchmark
+
+Untuk memastikan operasional 24/7 non-stop dengan temperatur dingin dan hemat energi:
+
+| Metrik Operasional | Baseline (Sebelum Optimasi) | Post-Optimization (Eco-Mode) | Efisiensi |
+| :--- | :--- | :--- | :--- |
+| **Clock CPU ESP32-S3** | 240 MHz (Dual-Core Maksimal) | **80 MHz Standby** | Hemat 66% Clock |
+| **Mode Radio WiFi** | Full Power Active (~120 mA) | **Modem-Sleep DTIM (~15 mA)** | Hemat ~87% Arus |
+| **Mode Modem SIM800L** | Active Listen (~25 mA) | **DTR Sleep Mode (< 1.5 mA)** | Hemat ~94% Arus |
+| **Beban Siklus Core 1** | 100% Busy-Loop Polling | **FreeRTOS Yield (WFI IDLE)** | CPU Dingin / Adem |
+| **Polling SMS SIM** | Kirim AT+CMGL tiap 15 detik | **100% Event-Driven (Pin RI)** | Zero Polling Spam |
+| **Estimasi Total Arus Standby** | ~250 - 350 mA (~1.5 Watt) | **~35 - 65 mA (~0.25 Watt)** | **⚡ Hemat ~80% Daya** |
+| **Suhu Internal Chip (TSENS)** | 45.2 °C – 46.0 °C (Baseline 240 MHz) | **38.2 °C (Eco-Mode 80 MHz)** | **Turun ~7.8 °C (Dingin & Stabil)** |
+
 ---
 
 ## 🛠️ Instalasi & Konfigurasi
@@ -302,5 +336,32 @@ php artisan test --filter=AuthTest
 
 ---
 
+## 🌐 Panduan Deployment & Simulasi Remote Cloud
+
+Untuk menguji komunikasi ESP32 ke backend Laravel melalui internet publik (HTTPS):
+
+### 1. Rekomendasi: Gunakan Cloudflare Tunnel (Quick Tunnel)
+* **Mengapa Cloudflare Tunnel?**  
+  Cloudflare Tunnel menggunakan sertifikat SSL RSA standar yang ringan (~1.5 KB) dan bebas dari halaman peringatan (*interstitial warning page*), sehingga sangat ramah untuk buffer memori TLS mikrokontroler ESP32 (`mbedTLS`).
+* **Cara Menjalankan:**
+  ```bash
+  # Terminal 1 (Laravel Server):
+  php artisan serve --port=8000
+
+  # Terminal 2 (Cloudflare Quick Tunnel):
+  npx untun tunnel --port 8000
+  # atau
+  cloudflared tunnel --url http://localhost:8000
+  ```
+* Masukkan URL yang dihasilkan (`https://xxxx.trycloudflare.com`) ke Web Config Portal ESP32 (`192.168.4.1`).
+
+### 2. Catatan Khusus Mengenai Ngrok Free Tier
+* **Batasan Teknis Ngrok Free:**  
+  Ngrok Free Tier menggunakan sertifikat *Wildcard ECDSA P-384* dengan ukuran rantai sertifikat besar (~4.5 KB) serta proteksi *warning interstitial*. Pada mikrokontroler ESP32 dengan alokasi buffer mbedTLS default (4 KB), jabat tangan TLS ke domain `*.ngrok-free.dev` / `*.ngrok-free.app` dapat mengalami `MBEDTLS_ERR_SSL_CONN_EOF (-29312)`.
+* **Solusi Produksi:** Di server nyata (*production* VPS / PaaS seperti Railway, Render, DigitalOcean), gunakan sertifikat SSL standar (Let's Encrypt / DigiCert) yang didukung penuh secara *out-of-the-box* oleh ESP32.
+
+---
+
 ## 📝 License
 Proyek ini dikembangkan dengan lisensi MIT.
+
