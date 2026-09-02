@@ -121,22 +121,31 @@ void handleTelegramBotCommands() {
             char uptimeBuf[32];
             snprintf(uptimeBuf, sizeof(uptimeBuf), "%02lud %02luh %02lum %02lus", days, hours, minutes, seconds);
 
-            String statusText = "📊 <b>STATUS SISTEM GATEWAY</b>\n";
-            statusText += "━━━━━━━━━━━━━━━━━━━━\n";
-            statusText += "📶 <b>Provider    :</b> " + op + "\n";
-            statusText += "📶 <b>Sinyal CSQ  :</b> " + String(signal) + "/31 (" + String(dbm) + " dBm) [" + signalQuality + "]\n";
-            statusText += "📱 <b>SIM Card    :</b> " + simStatus + " (" + regStatus + ")\n";
-            statusText += "⚡ <b>Tegangan GSM:</b> " + (currentVoltage > 0 ? String(currentVoltage, 2) + " V" : "Membaca...") + "\n";
-            statusText += "━━━━━━━━━━━━━━━━━━━━\n";
-            statusText += "🌐 <b>WiFi IP     :</b> " + wifi.getIP() + "\n";
-            statusText += "☁️ <b>Laravel API :</b> ";
+            float chipTemp = temperatureRead();
+            uint32_t totalHeap = ESP.getHeapSize() / 1024;
+            uint32_t freeHeap = ESP.getFreeHeap() / 1024;
+            uint32_t usedHeap = totalHeap - freeHeap;
+
+            String statusText = "<b>[ESP32 GATEWAY TASK MANAGER]</b>\n";
+            statusText += "------------------------------------\n";
+            statusText += "<b>CPU Clock   :</b> " + String(getCpuFrequencyMhz()) + " MHz\n";
+            statusText += "<b>Suhu Chip   :</b> " + String(chipTemp, 1) + " C\n";
+            statusText += "<b>RAM Usage   :</b> " + String(usedHeap) + " KB / " + String(totalHeap) + " KB (" + String(freeHeap) + " KB Free)\n";
+            statusText += "------------------------------------\n";
+            statusText += "<b>Provider    :</b> " + op + "\n";
+            statusText += "<b>Sinyal CSQ  :</b> " + String(signal) + "/31 (" + String(dbm) + " dBm) [" + signalQuality + "]\n";
+            statusText += "<b>SIM Card    :</b> " + simStatus + " (" + regStatus + ")\n";
+            statusText += "<b>Tegangan GSM:</b> " + (currentVoltage > 0 ? String(currentVoltage, 2) + " V" : "Membaca...") + "\n";
+            statusText += "------------------------------------\n";
+            statusText += "<b>WiFi IP     :</b> " + wifi.getIP() + "\n";
+            statusText += "<b>Laravel API :</b> ";
             statusText += (wifi.isServerSyncEnabled() ? (isLaravelConnected ? "Connected (OK)" : "Error / Unreachable") : "Non-aktif");
             statusText += "\n";
-            statusText += "━━━━━━━━━━━━━━━━━━━━\n";
-            statusText += "📩 <b>Total SMS   :</b> " + String(totalSms) + " Diterima\n";
-            statusText += "⏳ <b>Retry Queue :</b> " + String(queueSize) + " Tertunda\n";
-            statusText += "⏱️ <b>Uptime      :</b> " + String(uptimeBuf) + "\n";
-            statusText += "⚙️ <b>Kondisi     :</b> Standby OK";
+            statusText += "------------------------------------\n";
+            statusText += "<b>Total SMS   :</b> " + String(totalSms) + " Diterima\n";
+            statusText += "<b>Retry Queue :</b> " + String(queueSize) + " Tertunda\n";
+            statusText += "<b>Uptime      :</b> " + String(uptimeBuf) + "\n";
+            statusText += "<b>Kondisi     :</b> Eco-Standby Active";
             telegram.sendMessage(statusText);
 
         } else if (cmd.equalsIgnoreCase("/signal") || cmd.equalsIgnoreCase("/csq")) {
@@ -232,7 +241,11 @@ void setup() {
     Serial.println("\n==================================================");                                                         
     Serial.println("  ESP32-S3 SIM800L SMS Gateway (Eco-Mode Active)  ");                                                           
     Serial.println("==================================================");                                                           
-    Serial.printf("[Power] CPU Clock Berjalan pada: %d MHz\n", getCpuFrequencyMhz()); 
+    Serial.println("[Hardware Task Manager]");
+    Serial.printf(" - CPU Clock      : %d MHz\n", getCpuFrequencyMhz());
+    Serial.printf(" - Suhu Internal  : %.1f C\n", temperatureRead());
+    Serial.printf(" - Memory Heap    : %d KB Free / %d KB Total\n", ESP.getFreeHeap() / 1024, ESP.getHeapSize() / 1024);
+    Serial.printf(" - Flash Size     : %d MB\n", ESP.getFlashChipSize() / (1024 * 1024)); 
 
     // 0. Inisialisasi FreeRTOS Mutex untuk Sinkronisasi Thread-Safe
     gsmMutex = xSemaphoreCreateMutex();
