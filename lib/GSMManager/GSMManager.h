@@ -26,6 +26,11 @@ private:
     HardwareSerial* _serial;
     int _rxPin;
     int _txPin;
+    int _rstPin;
+    int _dtrPin;
+    int _riPin;
+    volatile bool _riTriggered;
+    bool _isSleeping;
     long _baudRate;
 
     GSMState _state;
@@ -54,7 +59,13 @@ private:
 public:
     GSMManager();
 
-    bool begin(HardwareSerial* serialPort = &Serial2, int rxPin = 16, int txPin = 17, long baudRate = 9600);
+    bool begin(HardwareSerial* serialPort = &Serial2,
+               int rxPin = 16,
+               int txPin = 17,
+               long baudRate = 9600,
+               int rstPin = -1,
+               int dtrPin = -1,
+               int riPin = -1);
     void update();
     bool hasNewSMS();
     SMSMessage readSMS();
@@ -78,6 +89,12 @@ public:
 
     // Remote AT Command execution
     String executeCustomAT(String command, uint32_t timeout = 3000);
+    void hardwareReset();                                                                                                           
+    void setSleepMode(bool enable);                                                                                                 
+    void wakeUp();                                                                                                                  
+    void notifyRingInterrupt();                                                                                                     
+    bool isRingTriggered();                                                                                                         
+    void clearRingTrigger();
 };
 
 #endif // GSM_MANAGER_H

@@ -2,13 +2,13 @@
 #define CONFIG_H
 
 // ============================================================================
-// WiFi Configuration
+// WiFi Configuration (Fallback jika NVS Flash kosong)
 // ============================================================================
 #define WIFI_SSID             "YOUR_WIFI_SSID"
 #define WIFI_PASSWORD         "YOUR_WIFI_PASSWORD"
 
 // ============================================================================
-// Backend Laravel API Configuration
+// Backend Laravel API Configuration (Mode 3)
 // ============================================================================
 #define API_URL               "http://192.168.1.100:8000"
 #define DEVICE_TOKEN          "ESP32_DEFAULT_SECRET_TOKEN_12345"
@@ -31,6 +31,14 @@
 #define SIM800_RX             16  // ESP32 RX2 connected to SIM800L TX
 #define SIM800_TX             17  // ESP32 TX2 connected to SIM800L RX
 #define SIM800_BAUD           9600
+
+// Control Hardware SIM800L (Opsional: gunakan -1 jika pin tidak disambungkan)
+#define SIM800_RST_PIN        7   // Pin Hardware Reset (Active LOW)
+#define SIM800_DTR_PIN        6   // Pin Sleep/Wake Control (HIGH=Sleep, LOW=Wake)
+#define SIM800_RI_PIN         5   // Pin Ring Indicator / SMS Interrupt (Active LOW)
+
+// Power Management Configuration
+#define GATEWAY_CPU_FREQ_MHZ  80  // Frekuensi CPU Standby (80 MHz hemat daya & dingin)
 
 // ============================================================================
 // OLED Display Configuration (SSD1306 0.96" I2C 128x64)
