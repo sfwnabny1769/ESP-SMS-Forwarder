@@ -63,12 +63,12 @@ bool ApiClient::sendSMS(SMSMessage sms) {
         secureClient.setAlpnProtocols(ALPN_HTTP11); // Negosiasi protokol HTTP/1.1 untuk Cloud Edge Proxy
         secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
-            Serial.println("[API] Gagal menginisialisasi HTTPS client.");
+            Serial.println("[API Security Error] Verifikasi sertifikat TLS gagal atau handshake ditolak. Menolak koneksi tidak tepercaya.");
             return false;
         }
     } else {
         if (!http.begin(plainClient, endpoint)) {
-            Serial.println("[API] Gagal menginisialisasi HTTP client.");
+            Serial.println("[API Error] Gagal menginisialisasi HTTP client.");
             return false;
         }
     }
@@ -134,6 +134,7 @@ bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, Str
         secureClient.setAlpnProtocols(ALPN_HTTP11); // Negosiasi protokol HTTP/1.1 untuk Cloud Edge Proxy
         secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
+            Serial.println("[API Security Error] Verifikasi TLS gagal pada Heartbeat. Menolak koneksi tidak tepercaya.");
             return false;
         }
     } else {
@@ -181,7 +182,7 @@ bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, Str
         if (httpCode > 0) {
             Serial.printf("[API] Heartbeat Error HTTP %d: %s\n", httpCode, http.getString().c_str());
         } else {
-            Serial.printf("[API] Heartbeat Gagal: %s\n", http.errorToString(httpCode).c_str());
+            Serial.printf("[API Security Warning] Heartbeat TLS/Network Failure: %s (Koneksi Dibatalkan)\n", http.errorToString(httpCode).c_str());
         }
     }
 
@@ -207,6 +208,7 @@ bool ApiClient::sendATResponse(String command, String response) {
         secureClient.setAlpnProtocols(ALPN_HTTP11);
         secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
+            Serial.println("[API Security Error] Verifikasi TLS gagal pada AT Response. Menolak koneksi tidak tepercaya.");
             return false;
         }
     } else {
