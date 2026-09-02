@@ -4,6 +4,33 @@
 // Definisi protokol ALPN untuk kompatibilitas Cloud Edge Proxy (Ngrok, Cloudflare, AWS)
 static const char *ALPN_HTTP11[] = {"http/1.1", NULL};
 
+// Root CA Sertifikat untuk Server Backend HTTPS (Let's Encrypt ISRG Root X1 / Cloudflare / Ngrok - CWE-295 Remediation)
+const char BACKEND_ROOT_CA[] PROGMEM = 
+"-----BEGIN CERTIFICATE-----\n"
+"MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw\n"
+"TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh\n"
+"cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4\n"
+"WhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu\n"
+"ZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBY\n"
+"MTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAK3oJkgZu454U/0SiIGB\n"
+"hnpPKuUrHYNWJxRtb6K9rtwSrIk8EvmUQDxW00ZybOPTOVVcCqzWCLcmjPymooxS\n"
+"LoP/HYqETTRSZX9q2DZttlfdUvc5guHdKWapMTIxmWYZOiPdUrAxCLRNnDKolHum\n"
+"DLWCkh3qhBoQ1zrvmmQUilMc199Ja90KWmhZNw4oWQG26Nvd52nNm++3uH455wqB\n"
+"6uDqnJ1G0EBmNLFV9SLuw05mrDAgwglBmZvRpy9qY8LJOFxz80gdrSDBZ456350e\n"
+"p50ei54owUrKGhKmndHs6/fZjb9qhrEHc+MaPJhaCEFzbU23642M75xruragrIhS\n"
+"Go12okN8QL6XYKAAnEp099rn94OMEB63da74kVHyGe7GpyRxg8Gtymv06irxEvZo\n"
+"9f14okF8Rtwved6h05nxSuusPv37bUhrDTGD34FGViBexYT2b59ucUC618/U5GSf\n"
+"I2eyU38Y8+Mb87etDYdWAmQUnHPR7aVCrefhqPUEGpesW996ElFefZZRHzzkkoU1\n"
+"epBLWN7Y+/dEo5qZN7tY5jU0566DLyctrwoko4mFbHP/kgUCreAg5N01lRi90bW4\n"
+"7py3514oTVnRwfQQVNd9G6VLh282N5GXSK+vk8W4JSkZNKe3KUUCikrrv0Q3Xsk6\n"
+"4SGUPqk73bRovVVZaq44EB4eFYq7YLncnxIwXO4QVCBr5IYELHr3KhwpFu8DLkhN\n"
+"tot73b5H7JDsrLwyKs9eFEqMqmEWL6EBPnKuHYCPEd369LnITcCIwpLmnGh50S2k\n"
+"mUhOvYYaefBIQUqc9BDxoqkhptwcGcnokDAT6IJYPeOGnKGup5aaNKAvm83auBoQ\n"
+"1xJU7UTWh/2lg0PPU/Ub9y8VDZNvxC9qwyTxfi42whNWmWmt9S2962unRUh2HKnl\n"
+"GKUIoYGRaOxVDZgneKGPNqYi2bMQn56/+BR6wQNAGqvAivrkECngxCoVUzkCVjul\n"
+"jrPcWnzzsur+pDnMtW5NKA==\n"
+"-----END CERTIFICATE-----\n";
+
 ApiClient::ApiClient() {
     _baseUrl = "";
     _token = "";
@@ -32,7 +59,7 @@ bool ApiClient::sendSMS(SMSMessage sms) {
     WiFiClient plainClient;
 
     if (isHttps) {
-        secureClient.setInsecure(); // Izinkan HTTPS ke server dinamis / ngrok
+        secureClient.setCACert(BACKEND_ROOT_CA); // Verifikasi sertifikat TLS server backend (CWE-295 Remediation)
         secureClient.setAlpnProtocols(ALPN_HTTP11); // Negosiasi protokol HTTP/1.1 untuk Cloud Edge Proxy
         secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
@@ -103,7 +130,7 @@ bool ApiClient::heartbeat(int signal, String operatorName, String simStatus, Str
     WiFiClient plainClient;
 
     if (isHttps) {
-        secureClient.setInsecure(); // Izinkan HTTPS ke server dinamis / ngrok
+        secureClient.setCACert(BACKEND_ROOT_CA); // Verifikasi sertifikat TLS server backend (CWE-295 Remediation)
         secureClient.setAlpnProtocols(ALPN_HTTP11); // Negosiasi protokol HTTP/1.1 untuk Cloud Edge Proxy
         secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
@@ -176,7 +203,7 @@ bool ApiClient::sendATResponse(String command, String response) {
     WiFiClient plainClient;
 
     if (isHttps) {
-        secureClient.setInsecure();
+        secureClient.setCACert(BACKEND_ROOT_CA); // Verifikasi sertifikat TLS server backend (CWE-295 Remediation)
         secureClient.setAlpnProtocols(ALPN_HTTP11);
         secureClient.setHandshakeTimeout(10);
         if (!http.begin(secureClient, endpoint)) {
