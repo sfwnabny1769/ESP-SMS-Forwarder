@@ -225,7 +225,7 @@ void telegramBotTask(void *pvParameters) {
         if (wifi.isConnected() && telegram.isConfigured()) {
             handleTelegramBotCommands();
         }
-        vTaskDelay(pdMS_TO_TICKS(2500)); // Delay 2.5 detik untuk polling perintah bot
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Jeda 1 detik antar-siklus long polling pasif (timeout 20s)
     }
 }
 
@@ -555,5 +555,5 @@ void loop() {
         xSemaphoreGive(gsmMutex);
     }
 
-    delay(15);
+    delay(25);
 }

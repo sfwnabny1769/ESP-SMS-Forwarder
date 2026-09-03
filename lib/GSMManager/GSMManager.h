@@ -37,6 +37,7 @@ private:
     unsigned long _lastStateTimer;
     unsigned long _lastHealthCheck;
     unsigned long _lastRegistrationCheck;
+    unsigned long _lastActivityTime;
     
     // Status tracking for state change logging
     int _lastCregCode;

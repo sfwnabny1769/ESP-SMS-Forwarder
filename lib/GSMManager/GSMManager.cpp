@@ -19,6 +19,7 @@ GSMManager::GSMManager() {
     _lastCsq = -1;
     _lastOperator = "";
     _hasAnnouncedRegistration = false;
+    _lastActivityTime = 0;
 }
 
 bool GSMManager::begin(HardwareSerial* serialPort, int rxPin, int txPin, long baudRate, int rstPin, int dtrPin, int riPin) {
@@ -31,6 +32,7 @@ bool GSMManager::begin(HardwareSerial* serialPort, int rxPin, int txPin, long ba
     _riPin = riPin;
     _riTriggered = false;
     _isSleeping = false;
+    _lastActivityTime = millis();
 
     //inisiasi pin RST jika dikonfigurasi
     if (_rstPin >= 0) {
@@ -97,6 +99,7 @@ String GSMManager::sendCommand(String command, uint32_t timeout) {
         delay(10);
     }
 
+    _lastActivityTime = millis();
     return response;
 }
 
@@ -282,6 +285,13 @@ void GSMManager::update() {
                     _hasAnnouncedRegistration = false;
                     _lastCregCode = -1;
                     return;
+                }
+            }
+
+            // Otomatisasi Mode Tidur Hemat Daya SIM800L (DTR HIGH / AT+CSCLK=1) saat idle > 4 detik
+            if (_dtrPin >= 0 && !_isSleeping && _smsQueue.empty() && _pendingSMSIndexes.empty()) {
+                if (currentMillis - _lastActivityTime >= 4000) {
+                    setSleepMode(true);
                 }
             }
             break;

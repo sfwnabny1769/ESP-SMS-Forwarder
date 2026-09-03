@@ -161,9 +161,9 @@ std::vector<TelegramIncomingMessage> TelegramClient::getNewMessages() {
     client.setCACert(TELEGRAM_ROOT_CA); // Verifikasi sertifikat TLS Root & Intermediate CA resmi (CWE-295 Remediation)
 
     HTTPClient https;
-    https.setTimeout(4000); // 4 detik timeout non-blocking
+    https.setTimeout(25000); // 25 detik socket timeout untuk long-polling pasif
 
-    String url = "https://api.telegram.org/bot" + _botToken + "/getUpdates?limit=5";
+    String url = "https://api.telegram.org/bot" + _botToken + "/getUpdates?limit=5&timeout=20";
     if (_lastUpdateId > 0) {
         url += "&offset=" + String(_lastUpdateId);
     }
