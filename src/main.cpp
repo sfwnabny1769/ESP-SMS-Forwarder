@@ -409,26 +409,27 @@ void loop() {
     if (xSemaphoreTake(gsmMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         gsm.update();
 
-    // 1. Query Tegangan Baterai & Health Check SIM800L setiap 30 detik                                                         
-    if (currentMillis - lastVoltageCheck >= 30000 || gsmVoltage == 0.0f) {                                                      
-        lastVoltageCheck = currentMillis;                                                                                       
-        float v = gsm.getBatteryVoltage();                                                                                      
-                                                                                                                                
-        if (v > 0.0f) {                                                                                                         
-            gsmVoltage = v;                                                                                                     
-            gsmConsecutiveFailures = 0; // Komunikasi normal, reset counter                                                     
-        } else {                                                                                                                
-            gsmConsecutiveFailures++;                                                                                           
-            Serial.printf("[GSM Health Warning] Kegagalan komunikasi GSM #%d/%d.\n",                                            
-                            gsmConsecutiveFailures, MAX_GSM_FAILURES_BEFORE_HARDWARE_RESET);                                      
-                                                                                                                                
-            if (gsmConsecutiveFailures >= MAX_GSM_FAILURES_BEFORE_HARDWARE_RESET) {                                             
-                Serial.println("[GSM Recovery] ⚠️ Modem tidak merespon berturut-turut! Memicu HARDWARE RESET...");              
-                gsm.hardwareReset();                                                                                            
-                gsmConsecutiveFailures = 0;                                                                                     
-            }                                                                                                                   
-        }                                                                                                                       
-    }                                                                                                                           
+        // 1. Query Tegangan Baterai & Health Check SIM800L setiap 30 detik
+        if (currentMillis - lastVoltageCheck >= 30000) {
+            lastVoltageCheck = currentMillis;
+            float v = gsm.getBatteryVoltage();
+
+            if (v > 0.0f) {
+                gsmVoltage = v;
+                gsmConsecutiveFailures = 0; // Komunikasi normal, reset counter
+            } else if (gsm.isNetworkRegistered()) { // Hanya hitung failure jika modem sudah seharusnya terdaftar
+                gsmConsecutiveFailures++;
+                Serial.printf("[GSM Health Warning] Kegagalan komunikasi GSM #%d/%d.\n", 
+                              gsmConsecutiveFailures, MAX_GSM_FAILURES_BEFORE_HARDWARE_RESET);
+
+                if (gsmConsecutiveFailures >= MAX_GSM_FAILURES_BEFORE_HARDWARE_RESET) {
+                    Serial.println("[GSM Recovery] ⚠️ Modem tidak merespon berturut-turut! Memicu HARDWARE RESET...");
+                    gsm.hardwareReset();
+                    gsmConsecutiveFailures = 0;
+                    lastVoltageCheck = millis() + 15000; // Beri jeda 15 detik setelah reset sebelum cek berikutnya
+                }
+            }
+        }                                                                                                                           
                 
         // [MODE 3] Heartbeat & Remote AT Console Loop
         if (wifi.isServerSyncEnabled() && wifi.getApiUrl().length() > 0 && wifi.isConnected()) {

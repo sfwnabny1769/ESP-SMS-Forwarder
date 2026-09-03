@@ -288,12 +288,6 @@ void GSMManager::update() {
                 }
             }
 
-            // Otomatisasi Mode Tidur Hemat Daya SIM800L (DTR HIGH / AT+CSCLK=1) saat idle > 4 detik
-            if (_dtrPin >= 0 && !_isSleeping && _smsQueue.empty() && _pendingSMSIndexes.empty()) {
-                if (currentMillis - _lastActivityTime >= 4000) {
-                    setSleepMode(true);
-                }
-            }
             break;
         }
 
